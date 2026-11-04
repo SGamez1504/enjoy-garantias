@@ -4,12 +4,15 @@
 (() => {
   const ahora = () => new Date().toISOString();
   const db = { casos: [], caso_historial: [] };
-  const archivos = new Map();
+  const archivos = { guias: new Map(), evidencias: new Map() };
   let nextId = 1;
   let nextHist = 1;
 
   function revisar(c) {
     if (!['recibido_tienda', 'enviado_fabrica', 'devuelto_tienda', 'entregado_cliente', 'pedido_reposicion', 'cambio_producto'].includes(c.estado)) return 'casos_estado_valido';
+    if (!c.recibido_por?.trim()) return 'casos_recibido_por';
+    const nFotos = c.fotos_envio.length;
+    if (c.fecha_envio ? nFotos < 1 || nFotos > 5 : nFotos !== 0) return 'casos_envio_con_fotos';
     if (!c.fecha_envio !== !c.guia_path) return 'casos_envio_con_guia';
     if (c.estado === 'enviado_fabrica' && !c.guia_path) return 'casos_enviado_requiere_guia';
     if (c.estado === 'devuelto_tienda' && !c.fecha_devolucion) return 'casos_devuelto_requiere_fecha';
@@ -21,33 +24,41 @@
   const historial = (caso_id, estado) => db.caso_historial.push({
     id: nextHist++, caso_id, estado, usuario: 'demo@enjoy.test', created_at: ahora(),
   });
-  const violacion = (r) => ({ error: { message: `new row violates check constraint "${r}"` } });
+  const violacion = (r) => ({ data: null, error: { message: `new row violates check constraint "${r}"` } });
 
   function crear(o) {
     const c = {
-      id: nextId++, fecha_envio: null, guia_path: null, guia_nombre: null, fecha_devolucion: null,
+      id: nextId++, fecha_envio: null, guia_path: null, guia_nombre: null, fotos_envio: [], fecha_devolucion: null,
       estado: 'recibido_tienda', created_at: ahora(), updated_at: ahora(), ...o,
     };
     const r = revisar(c);
     if (r) return violacion(r);
     db.casos.push(c);
     historial(c.id, c.estado);
-    return { error: null };
+    return { data: { ...c }, error: null };
   }
 
   function consulta(tabla) {
-    const q = { filtros: [], orden: null, rango: null, cambios: null };
+    const q = { filtros: [], orden: null, rango: null, cambios: null, borrar: false, creado: null, unico: false };
     const api = {
       select: () => api,
+      single: () => { q.unico = true; return api; },
       eq: (k, v) => { q.filtros.push([k, v]); return api; },
       order: (k, o = {}) => { q.orden = [k, o.ascending !== false]; return api; },
       range: (a, b) => { q.rango = [a, b]; return api; },
-      insert: (o) => Promise.resolve(crear(o)),
+      insert: (o) => { q.creado = o; return api; },
       update: (o) => { q.cambios = o; return api; },
+      delete: () => { q.borrar = true; return api; },
       then: (ok, ko) => Promise.resolve(ejecutar()).then(ok, ko),
     };
     function ejecutar() {
+      if (q.creado) return crear(q.creado);
       let filas = db[tabla].filter((f) => q.filtros.every(([k, v]) => f[k] === v));
+      if (q.borrar) {
+        db[tabla] = db[tabla].filter((f) => !filas.includes(f));
+        for (const f of filas) db.caso_historial = db.caso_historial.filter((h) => h.caso_id !== f.id);
+        return { data: filas.map((f) => ({ id: f.id })), error: null };
+      }
       if (q.cambios) {
         for (const f of filas) {
           const nuevo = { ...f, ...q.cambios };
@@ -56,7 +67,7 @@
           if (nuevo.estado !== f.estado) historial(f.id, nuevo.estado);
           Object.assign(f, nuevo);
         }
-        return { error: null };
+        return { data: null, error: null };
       }
       if (q.orden) {
         const [k, asc] = q.orden;
@@ -68,9 +79,16 @@
     return api;
   }
 
-  crear({ numero_pedido: 'EV-10231', cliente_nombre: 'Laura Méndez', cliente_numero: '300 555 0142', fecha_recibido: '2026-10-28', producto: 'Control DualSense', numero_serial: 'DS5-88213', falla: 'Drift en el stick izquierdo' });
-  crear({ numero_pedido: 'EV-10198', cliente_nombre: 'Andrés Rojas', cliente_numero: '310 555 0187', fecha_recibido: '2026-10-20', producto: 'Nintendo Switch OLED', numero_serial: 'XTW70012345', falla: 'No carga por el puerto USB-C, se apaga al conectar el dock', fecha_envio: '2026-10-22', guia_path: 'demo/guia.pdf', guia_nombre: 'guia-demo.pdf', estado: 'enviado_fabrica' });
-  archivos.set('demo/guia.pdf', new Blob(['%PDF-1.4 demo'], { type: 'application/pdf' }));
+  const foto = (color) => new Blob(
+    [`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 3"><rect width="4" height="3" fill="${color}"/></svg>`],
+    { type: 'image/svg+xml' },
+  );
+
+  crear({ numero_pedido: 'EV-10231', cliente_nombre: 'Laura Méndez', cliente_numero: '300 555 0142', fecha_recibido: '2026-10-28', recibido_por: 'Asesor Demo', producto: 'Control DualSense', numero_serial: 'DS5-88213', falla: 'Drift en el stick izquierdo' });
+  crear({ numero_pedido: 'EV-10198', cliente_nombre: 'Andrés Rojas', cliente_numero: '310 555 0187', fecha_recibido: '2026-10-20', recibido_por: 'Asesor Demo', producto: 'Nintendo Switch OLED', numero_serial: 'XTW70012345', falla: 'No carga por el puerto USB-C, se apaga al conectar el dock y la pantalla parpadea cuando se juega en modo portátil', fecha_envio: '2026-10-22', guia_path: '2/guia.pdf', guia_nombre: 'guia-demo.pdf', fotos_envio: ['2/a.jpg', '2/b.jpg'], estado: 'enviado_fabrica' });
+  archivos.guias.set('2/guia.pdf', new Blob(['%PDF-1.4 demo'], { type: 'application/pdf' }));
+  archivos.evidencias.set('2/a.jpg', foto('#c85'));
+  archivos.evidencias.set('2/b.jpg', foto('#58c'));
 
   let sesion = null;
   const oyentes = [];
@@ -80,11 +98,22 @@
     createClient: () => ({
       from: consulta,
       storage: {
-        from: () => ({
-          upload: async (path, file) => { archivos.set(path, file); return { error: null }; },
-          createSignedUrl: async (path) => archivos.has(path)
-            ? { data: { signedUrl: URL.createObjectURL(archivos.get(path)) }, error: null }
+        from: (bucket) => ({
+          upload: async (path, file) => { archivos[bucket].set(path, file); return { error: null }; },
+          createSignedUrl: async (path) => archivos[bucket].has(path)
+            ? { data: { signedUrl: URL.createObjectURL(archivos[bucket].get(path)) }, error: null }
             : { error: { message: 'Object not found' } },
+          createSignedUrls: async (paths) => ({
+            data: paths.filter((p) => archivos[bucket].has(p))
+              .map((path) => ({ path, signedUrl: URL.createObjectURL(archivos[bucket].get(path)) })),
+            error: null,
+          }),
+          list: async (carpeta) => ({
+            data: [...archivos[bucket].keys()].filter((p) => p.startsWith(`${carpeta}/`))
+              .map((p) => ({ name: p.slice(carpeta.length + 1) })),
+            error: null,
+          }),
+          remove: async (paths) => { paths.forEach((p) => archivos[bucket].delete(p)); return { error: null }; },
         }),
       },
       auth: {
@@ -99,4 +128,7 @@
       },
     }),
   };
+
+  // Solo para las pruebas: permite revisar los archivos sin pasar por la interfaz.
+  window.__demo = { db: () => db, archivos };
 })();

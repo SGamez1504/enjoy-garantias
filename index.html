@@ -54,14 +54,13 @@
             <th>Caso</th>
             <th>Pedido</th>
             <th>Cliente</th>
-            <th>Número cliente</th>
             <th>Recibido</th>
             <th>Producto</th>
-            <th>Serial</th>
             <th>Falla</th>
             <th>Fecha envío</th>
-            <th>Guía</th>
+            <th>Evidencia</th>
             <th>Recibido de fábrica</th>
+            <th>Constancia</th>
             <th class="fija">Estado</th>
           </tr>
         </thead>
@@ -78,11 +77,12 @@
       <div class="rejilla">
         <label>Número de pedido <input name="numero_pedido" required></label>
         <label>Fecha de recibido <input name="fecha_recibido" type="date" required></label>
-        <label>Nombre del cliente <input name="cliente_nombre" required></label>
-        <label>Número del cliente <input name="cliente_numero" required></label>
+        <label>Nombre del cliente <input name="cliente_nombre" autocomplete="off" required></label>
+        <label>Número del cliente <input name="cliente_numero" inputmode="tel" autocomplete="off" required></label>
         <label>Producto <input name="producto" required></label>
         <label>Número serial <input name="numero_serial" required></label>
         <label class="ancho">Falla <textarea name="falla" rows="2" required></textarea></label>
+        <label class="ancho">Recibido por <input name="recibido_por" placeholder="Nombre de quien recibe en tienda" required></label>
       </div>
       <fieldset id="campos-edicion" hidden>
         <legend>Seguimiento</legend>
@@ -91,8 +91,12 @@
           <label>Fecha de envío <input name="fecha_envio" type="date"></label>
           <label>Recibido de fábrica <input name="fecha_devolucion" type="date"></label>
           <label>Reemplazar guía (PDF) <input name="guia" type="file" accept="application/pdf,.pdf"></label>
+          <div class="ancho">
+            <p class="campo-titulo">Reemplazar fotos de evidencia</p>
+            <div id="fotos-edicion" class="fotos-selector"></div>
+          </div>
         </div>
-        <p class="ayuda">Si borras la fecha de envío, el caso también deja de tener guía.</p>
+        <p class="ayuda">Si agregas fotos aquí, reemplazan todas las anteriores. Si borras la fecha de envío, el caso deja de tener guía y fotos.</p>
       </fieldset>
       <p class="error" role="alert" hidden></p>
       <div class="dlg-acciones">
@@ -109,6 +113,10 @@
       <p class="dlg-sub"></p>
       <label>Fecha de envío <input name="fecha_envio" type="date" required></label>
       <label>Guía en PDF <input name="guia" type="file" accept="application/pdf,.pdf" required></label>
+      <div>
+        <p class="campo-titulo">Fotos de evidencia del envío (de 1 a 5, obligatorias)</p>
+        <div id="fotos-envio" class="fotos-selector"></div>
+      </div>
       <p class="error" role="alert" hidden></p>
       <div class="dlg-acciones">
         <button class="sutil" type="button" data-cerrar>Cancelar</button>
@@ -136,6 +144,10 @@
     <div class="detalle">
       <h2 id="det-titulo"></h2>
       <dl id="det-datos"></dl>
+      <div id="det-fotos-bloque" hidden>
+        <h3>Fotos de evidencia del envío</h3>
+        <div id="det-fotos" class="miniaturas"></div>
+      </div>
       <h3>Historial</h3>
       <ol id="det-historial" class="historial"></ol>
       <p class="error" role="alert" hidden></p>
@@ -143,10 +155,26 @@
     </div>
   </dialog>
 
+  <!-- Confirmar eliminación -->
+  <dialog id="dlg-eliminar">
+    <form id="form-eliminar" method="dialog">
+      <h2 id="elim-titulo"></h2>
+      <p id="elim-detalle" class="dlg-texto"></p>
+      <p class="dlg-texto">Se borrarán definitivamente el caso, su historial, la guía en PDF y las fotos. <strong>Esta acción no se puede deshacer.</strong></p>
+      <p class="error" role="alert" hidden></p>
+      <div class="dlg-acciones">
+        <button class="sutil" type="button" data-cerrar>Cancelar</button>
+        <button class="peligro" type="submit">Eliminar definitivamente</button>
+      </div>
+    </form>
+  </dialog>
+
   <div id="aviso" class="aviso" role="status" hidden></div>
 
   <script src="vendor/supabase.js"></script>
+  <script src="vendor/jspdf.umd.min.js"></script>
   <script src="config.js"></script>
+  <script src="constancia.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

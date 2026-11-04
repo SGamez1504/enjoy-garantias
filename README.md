@@ -9,12 +9,20 @@ Tabla para llevar cada caso de garantía desde que el producto llega a la tienda
 
 | Paso | Qué se hace | Estado resultante |
 |---|---|---|
-| 1. Abrir caso | Pedido, cliente, número, fecha de recibido, producto, serial y falla | Recibido en tienda |
-| 2. Registrar envío | Fecha de envío + **PDF de la guía (obligatorio)** | Enviado a fábrica |
+| 1. Abrir caso | Pedido, cliente, número, fecha de recibido, quién recibe, producto, serial y falla | Recibido en tienda |
+| 2. Registrar envío | Fecha de envío + **PDF de la guía y de 1 a 5 fotos de evidencia (obligatorios)** | Enviado a fábrica |
 | 3. Registrar recibido | Fecha en que vuelve de fábrica | Devuelto a tienda |
 | 4. Entregar | Un clic | Entregado al cliente |
 
-Los estados excepcionales, **Pedido producto reposición** y **Cambio de producto**, se marcan desde el detalle del caso (clic en el número `#`). Todo cambio de estado queda en el historial con fecha y usuario. Los errores se corrigen con **Editar**, en el mismo detalle.
+Los estados excepcionales, **Pedido producto reposición** y **Cambio de producto**, se marcan desde el detalle del caso (clic en el número `#`). Todo cambio de estado queda en el historial con fecha y usuario. En ese mismo detalle están **Editar**, para corregir errores, y **Eliminar**, que pide confirmación y borra de forma definitiva el caso, su historial, la guía y las fotos.
+
+La página funciona en computador, tablet y celular. En pantallas de hasta 1100 px cada caso se muestra como una tarjeta.
+
+## Constancia de recepción
+
+**Generar PDF** descarga un documento para entregar al cliente con los datos del caso, la fecha de recibido, quién lo recibió, un espacio para firmas y un resumen de la política de garantía. A propósito no incluye el estado del caso.
+
+El resumen de la política está en `constancia.js` (`POLITICA`) y resume [la política publicada](https://enjoyvideogames.com.co/garantia/), revisada el 2026-11-04. **Si la política cambia en la web, hay que actualizarlo ahí.** Los datos de la empresa están en `EMPRESA`, en el mismo archivo.
 
 ## Puesta en marcha
 
@@ -42,7 +50,11 @@ En el plan gratis de GitHub, Pages exige que el repositorio sea público, y la d
   - **Comprobarla:** después de conectar la base de datos, ve a la pestaña **Actions > Mantener Supabase activo > Run workflow**. Debe terminar en verde con el mensaje "Supabase activo".
   - **Reactivarla:** GitHub desactiva las tareas programadas si el repositorio pasa 60 días sin cambios. Avisa por correo a la cuenta dueña; se reactiva en esa misma pestaña con **Enable workflow**.
 - El plan gratis **no incluye respaldos automáticos**, y la tarea anterior no los reemplaza. Conviene exportar los casos periódicamente o pasar al plan pago.
-- Los casos no se pueden borrar desde la página, a propósito. Si hace falta, se borran desde el panel de Supabase.
+- Las fotos se reducen a un máximo de 2000 px en JPG antes de subirlas, para no consumir rápido el espacio del plan gratis (1 GB).
+
+## Cambios en la base de datos
+
+`supabase/schema.sql` siempre describe la base completa y sirve para un proyecto nuevo. Un proyecto existente se actualiza ejecutando una sola vez, en orden, los archivos de `supabase/migraciones/`.
 
 ## Desarrollo
 
@@ -62,4 +74,4 @@ npm run demo
 
 Abre la página en `http://localhost:5173` con una base falsa en memoria (`tests/demo-supabase.js`), que se reinicia al recargar. Entra con cualquier correo y la contraseña `demo`.
 
-`vendor/supabase.js` es la copia de `@supabase/supabase-js` (`dist/umd/supabase.js`) que usa la página. Si actualizas el paquete, vuelve a copiarla.
+`vendor/` guarda las copias que usa la página: `@supabase/supabase-js` (`dist/umd/supabase.js`) y `jspdf` (`dist/jspdf.umd.min.js`). Si actualizas un paquete, vuelve a copiar su archivo.

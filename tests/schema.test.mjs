@@ -28,8 +28,9 @@ const STUBS = `
   alter table storage.objects enable row level security;
 `;
 
-const APERTURA = `numero_pedido, cliente_nombre, cliente_numero, fecha_recibido, producto, numero_serial, falla`;
-const VALORES = `'P-1', 'Ana', '3001234567', '2026-11-01', 'PS5', 'SN1', 'No enciende'`;
+const APERTURA = `numero_pedido, cliente_nombre, cliente_numero, fecha_recibido, recibido_por, producto, numero_serial, falla`;
+const VALORES = `'P-1', 'Ana', '3001234567', '2026-11-01', 'Sergio', 'PS5', 'SN1', 'No enciende'`;
+const FOTOS = `array['1/a.jpg']`;
 
 async function crearCaso() {
   const { rows } = await db.query(`insert into casos (${APERTURA}) values (${VALORES}) returning *`);
@@ -47,6 +48,8 @@ test('un caso nuevo arranca en "recibido en tienda" con el historial lleno', asy
   const caso = await crearCaso();
   assert.equal(caso.estado, 'recibido_tienda');
   assert.equal(caso.fecha_envio, null);
+  assert.equal(caso.recibido_por, 'Sergio');
+  assert.deepEqual(caso.fotos_envio, []);
   const { rows } = await db.query('select * from caso_historial where caso_id = $1', [caso.id]);
   assert.equal(rows.length, 1);
   assert.equal(rows[0].estado, 'recibido_tienda');
@@ -56,12 +59,22 @@ test('un caso nuevo arranca en "recibido en tienda" con el historial lleno', asy
 test('no se puede enviar a fábrica sin guía', async () => {
   const { id } = await crearCaso();
   await rechaza(`update casos set estado = 'enviado_fabrica' where id = ${id}`, 'casos_enviado_requiere_guia');
-  await rechaza(`update casos set fecha_envio = '2026-11-02' where id = ${id}`, 'casos_envio_con_guia');
+  await rechaza(`update casos set fecha_envio = '2026-11-02', fotos_envio = ${FOTOS} where id = ${id}`, 'casos_envio_con_guia');
+});
+
+test('el envío exige de 1 a 5 fotos', async () => {
+  const { id } = await crearCaso();
+  const envio = `fecha_envio = '2026-11-02', guia_path = 'g.pdf'`;
+  await rechaza(`update casos set ${envio} where id = ${id}`, 'casos_envio_con_fotos');
+  const seis = `array['1','2','3','4','5','6']`;
+  await rechaza(`update casos set ${envio}, fotos_envio = ${seis} where id = ${id}`, 'casos_envio_con_fotos');
+  await rechaza(`update casos set fotos_envio = ${FOTOS} where id = ${id}`, 'casos_envio_con_fotos');
+  await db.exec(`update casos set ${envio}, fotos_envio = array['1','2','3','4','5'] where id = ${id}`);
 });
 
 test('flujo completo de las 4 fases deja historial en orden', async () => {
   const { id } = await crearCaso();
-  await db.exec(`update casos set fecha_envio = '2026-11-02', guia_path = '${id}/g.pdf', estado = 'enviado_fabrica' where id = ${id}`);
+  await db.exec(`update casos set fecha_envio = '2026-11-02', guia_path = '${id}/g.pdf', fotos_envio = ${FOTOS}, estado = 'enviado_fabrica' where id = ${id}`);
   await db.exec(`update casos set fecha_devolucion = '2026-11-10', estado = 'devuelto_tienda' where id = ${id}`);
   await db.exec(`update casos set estado = 'entregado_cliente' where id = ${id}`);
   const { rows } = await db.query('select estado from caso_historial where caso_id = $1 order by id', [id]);
@@ -72,8 +85,8 @@ test('flujo completo de las 4 fases deja historial en orden', async () => {
 test('devuelto a tienda exige fecha, y las fechas deben ir en orden', async () => {
   const { id } = await crearCaso();
   await rechaza(`update casos set estado = 'devuelto_tienda' where id = ${id}`, 'casos_devuelto_requiere_fecha');
-  await rechaza(`update casos set fecha_envio = '2026-10-01', guia_path = 'x.pdf' where id = ${id}`, 'casos_envio_orden');
-  await db.exec(`update casos set fecha_envio = '2026-11-05', guia_path = 'x.pdf' where id = ${id}`);
+  await rechaza(`update casos set fecha_envio = '2026-10-01', guia_path = 'x.pdf', fotos_envio = ${FOTOS} where id = ${id}`, 'casos_envio_orden');
+  await db.exec(`update casos set fecha_envio = '2026-11-05', guia_path = 'x.pdf', fotos_envio = ${FOTOS} where id = ${id}`);
   await rechaza(`update casos set fecha_devolucion = '2026-11-04' where id = ${id}`, 'casos_devolucion_orden');
 });
 
@@ -91,22 +104,38 @@ test('editar datos sin cambiar estado no ensucia el historial', async () => {
   assert.equal(rows[0].n, 1);
 });
 
-test('campos de apertura vacíos se rechazan', () =>
-  rechaza(`insert into casos (${APERTURA}) values ('  ', 'Ana', '1', '2026-11-01', 'PS5', 'S', 'F')`, 'casos_apertura_completa'));
+test('campos de apertura vacíos se rechazan', async () => {
+  await rechaza(`insert into casos (${APERTURA}) values ('  ', 'Ana', '1', '2026-11-01', 'Sergio', 'PS5', 'S', 'F')`, 'casos_apertura_completa');
+  await rechaza(`insert into casos (${APERTURA}) values ('P', 'Ana', '1', '2026-11-01', '  ', 'PS5', 'S', 'F')`, 'casos_recibido_por');
+});
 
-test('permisos: anon no ve nada; authenticated crea y edita pero no borra', async () => {
+test('permisos: anon no ve nada ni borra; authenticated crea, edita y borra', async () => {
   const { id } = await crearCaso();
   await db.exec('set role anon');
   await assert.rejects(db.query('select * from casos'), /permission denied/);
   await assert.rejects(db.query('select * from caso_historial'), /permission denied/);
+  await assert.rejects(db.query(`delete from casos where id = ${id}`), /permission denied/);
   await db.exec('reset role; set role authenticated');
   try {
     const nuevo = await crearCaso(); // inserta también en historial vía trigger
     await db.exec(`update casos set falla = 'Otra' where id = ${nuevo.id}`);
     const { rows } = await db.query('select id from casos where id = $1', [id]);
     assert.equal(rows.length, 1);
-    await assert.rejects(db.query(`delete from casos where id = ${id}`), /permission denied/);
     await assert.rejects(db.query(`insert into caso_historial (caso_id, estado) values (${id}, 'x')`), /permission denied/);
+    await assert.rejects(db.query(`delete from caso_historial where caso_id = ${id}`), /permission denied/);
+  } finally {
+    await db.exec('reset role');
+  }
+});
+
+test('eliminar un caso se lleva su historial', async () => {
+  const { id } = await crearCaso();
+  await db.exec('set role authenticated');
+  try {
+    const { rows } = await db.query(`delete from casos where id = ${id} returning id`);
+    assert.equal(rows.length, 1);
+    const hist = await db.query('select count(*)::int as n from caso_historial where caso_id = $1', [id]);
+    assert.equal(hist.rows[0].n, 0);
   } finally {
     await db.exec('reset role');
   }
@@ -124,8 +153,10 @@ test('ping responde ok sin sesión y sigue sin dar acceso a los casos', async ()
   }
 });
 
-test('el bucket de guías es privado y solo acepta PDF', async () => {
-  const { rows } = await db.query(`select * from storage.buckets where id = 'guias'`);
-  assert.equal(rows[0].public, false);
-  assert.deepEqual(rows[0].allowed_mime_types, ['application/pdf']);
+test('los buckets son privados y limitados por tipo de archivo', async () => {
+  const { rows } = await db.query(`select * from storage.buckets order by id`);
+  assert.deepEqual(rows.map((b) => [b.id, b.public, b.allowed_mime_types]), [
+    ['evidencias', false, ['image/jpeg']],
+    ['guias', false, ['application/pdf']],
+  ]);
 });
