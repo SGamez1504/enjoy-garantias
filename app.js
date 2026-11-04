@@ -53,7 +53,7 @@ function h(tag, attrs = {}, ...hijos) {
     if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
     else el.setAttribute(k, v);
   }
-  el.append(...hijos.filter((x) => x !== null && x !== undefined));
+  el.append(...hijos.filter((x) => x !== null && x !== undefined && x !== false));
   return el;
 }
 
