@@ -93,8 +93,42 @@ test('devuelto a tienda exige fecha, y las fechas deben ir en orden', async () =
 test('los estados excepcionales no requieren guía; un estado inventado se rechaza', async () => {
   const { id } = await crearCaso();
   await db.exec(`update casos set estado = 'pedido_reposicion' where id = ${id}`);
-  await db.exec(`update casos set estado = 'cambio_producto' where id = ${id}`);
+  await db.exec(`update casos set estado = 'cambio_producto', nuevo_producto = 'PS5 Pro', nuevo_numero_serial = 'SN2', cambio_erp_confirmado = true where id = ${id}`);
   await rechaza(`update casos set estado = 'perdido' where id = ${id}`, 'casos_estado_valido');
+});
+
+test('el cambio de producto exige producto, serial y confirmación del ERP', async () => {
+  const { id } = await crearCaso();
+  const r = 'casos_cambio_completo';
+  await rechaza(`update casos set estado = 'cambio_producto' where id = ${id}`, r);
+  await rechaza(`update casos set estado = 'cambio_producto', nuevo_producto = 'X', nuevo_numero_serial = 'S' where id = ${id}`, r);
+  await rechaza(`update casos set estado = 'cambio_producto', nuevo_producto = ' ', nuevo_numero_serial = 'S', cambio_erp_confirmado = true where id = ${id}`, r);
+  await rechaza(`update casos set estado = 'cambio_producto', nuevo_producto = 'X', cambio_erp_confirmado = true where id = ${id}`, r);
+  await db.exec(`update casos set estado = 'cambio_producto', nuevo_producto = 'X', nuevo_numero_serial = 'S', cambio_erp_confirmado = true where id = ${id}`);
+  // Después de entregar, los datos del cambio se conservan.
+  await db.exec(`update casos set estado = 'entregado_cliente' where id = ${id}`);
+  const { rows } = await db.query('select nuevo_producto from casos where id = $1', [id]);
+  assert.equal(rows[0].nuevo_producto, 'X');
+});
+
+test('el número de caso es G-EVG-pedido, único y no se puede fijar a mano', async () => {
+  const crear = async (pedido, extra = '') => (await db.query(
+    `insert into casos (${APERTURA}${extra ? ', numero_caso' : ''}) values ('${pedido}', 'Ana', '1', '2026-11-01', 'Sergio', 'PS5', 'S', 'F'${extra}) returning id, numero_caso`,
+  )).rows[0];
+
+  const a = await crear('94035');
+  assert.equal(a.numero_caso, 'G-EVG-94035');
+  assert.equal((await crear('94035')).numero_caso, 'G-EVG-94035-2');
+  assert.equal((await crear('94035')).numero_caso, 'G-EVG-94035-3');
+  assert.equal((await crear('#555')).numero_caso, 'G-EVG-555');
+  assert.equal((await crear('777', ", 'INVENTADO'")).numero_caso, 'G-EVG-777');
+
+  const editar = async (sql) => (await db.query(`update casos set ${sql} where id = ${a.id} returning numero_caso`)).rows[0].numero_caso;
+  assert.equal(await editar(`falla = 'Otra'`), 'G-EVG-94035');
+  assert.equal(await editar(`numero_caso = 'INVENTADO'`), 'G-EVG-94035');
+  assert.equal(await editar(`numero_pedido = '88888'`), 'G-EVG-88888');
+  // Guardar el mismo pedido no le agrega sufijo a su propio número.
+  assert.equal(await editar(`numero_pedido = '88888'`), 'G-EVG-88888');
 });
 
 test('editar datos sin cambiar estado no ensucia el historial', async () => {

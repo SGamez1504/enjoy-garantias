@@ -11,6 +11,7 @@
   function revisar(c) {
     if (!['recibido_tienda', 'enviado_fabrica', 'devuelto_tienda', 'entregado_cliente', 'pedido_reposicion', 'cambio_producto'].includes(c.estado)) return 'casos_estado_valido';
     if (!c.recibido_por?.trim()) return 'casos_recibido_por';
+    if (c.estado === 'cambio_producto' && !(c.nuevo_producto?.trim() && c.nuevo_numero_serial?.trim() && c.cambio_erp_confirmado)) return 'casos_cambio_completo';
     const nFotos = c.fotos_envio.length;
     if (c.fecha_envio ? nFotos < 1 || nFotos > 5 : nFotos !== 0) return 'casos_envio_con_fotos';
     if (!c.fecha_envio !== !c.guia_path) return 'casos_envio_con_guia';
@@ -26,9 +27,17 @@
   });
   const violacion = (r) => ({ data: null, error: { message: `new row violates check constraint "${r}"` } });
 
+  function numeroCaso(pedido, id) {
+    const base = `G-EVG-${pedido.trim().replace(/^#+\s*/, '')}`;
+    let candidato = base;
+    for (let n = 2; db.casos.some((c) => c.numero_caso === candidato && c.id !== id); n += 1) candidato = `${base}-${n}`;
+    return candidato;
+  }
+
   function crear(o) {
+    const id = nextId++;
     const c = {
-      id: nextId++, fecha_envio: null, guia_path: null, guia_nombre: null, fotos_envio: [], fecha_devolucion: null,
+      id, numero_caso: numeroCaso(o.numero_pedido, id), nuevo_producto: null, nuevo_numero_serial: null, cambio_erp_confirmado: false, fecha_envio: null, guia_path: null, guia_nombre: null, fotos_envio: [], fecha_devolucion: null,
       estado: 'recibido_tienda', created_at: ahora(), updated_at: ahora(), ...o,
     };
     const r = revisar(c);
@@ -62,6 +71,7 @@
       if (q.cambios) {
         for (const f of filas) {
           const nuevo = { ...f, ...q.cambios };
+          if (nuevo.numero_pedido !== f.numero_pedido) nuevo.numero_caso = numeroCaso(nuevo.numero_pedido, f.id);
           const r = revisar(nuevo);
           if (r) return violacion(r);
           if (nuevo.estado !== f.estado) historial(f.id, nuevo.estado);

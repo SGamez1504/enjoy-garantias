@@ -20,7 +20,7 @@
   <!-- Inicio de sesión -->
   <main id="vista-login" class="centrado" hidden>
     <form id="form-login" class="tarjeta">
-      <p class="marca">Enjoy Videogames</p>
+      <div class="login-logo"><img src="assets/logo-enjoy.png" alt="Enjoy Video Games" width="150" height="60"></div>
       <h1>Control de garantías</h1>
       <label>Correo <input name="email" type="email" autocomplete="username" required></label>
       <label>Contraseña <input name="password" type="password" autocomplete="current-password" required></label>
@@ -32,8 +32,8 @@
   <!-- Sistema -->
   <div id="vista-app" hidden>
     <header class="barra">
-      <div>
-        <p class="marca">Enjoy Videogames</p>
+      <div class="barra-marca">
+        <img class="logo" src="assets/logo-enjoy.png" alt="Enjoy Video Games" width="106" height="42">
         <h1>Control de garantías</h1>
       </div>
       <div class="barra-acciones">
@@ -52,7 +52,6 @@
         <thead>
           <tr>
             <th>Caso</th>
-            <th>Pedido</th>
             <th>Cliente</th>
             <th>Recibido</th>
             <th>Producto</th>
@@ -91,6 +90,11 @@
           <label>Fecha de envío <input name="fecha_envio" type="date"></label>
           <label>Recibido de fábrica <input name="fecha_devolucion" type="date"></label>
           <label>Reemplazar guía (PDF) <input name="guia" type="file" accept="application/pdf,.pdf"></label>
+          <div id="campos-cambio" class="ancho rejilla" hidden>
+            <label>Nuevo producto <input name="nuevo_producto"></label>
+            <label>Nuevo número serial <input name="nuevo_numero_serial"></label>
+            <label class="check ancho"><input name="cambio_erp" type="checkbox"> <span>Ya hice el cambio en el ERP de ENJOY</span></label>
+          </div>
           <div class="ancho">
             <p class="campo-titulo">Reemplazar fotos de evidencia</p>
             <div id="fotos-edicion" class="fotos-selector"></div>
@@ -153,6 +157,22 @@
       <p class="error" role="alert" hidden></p>
       <div class="dlg-acciones" id="det-acciones"></div>
     </div>
+  </dialog>
+
+  <!-- Cambio de producto -->
+  <dialog id="dlg-cambio">
+    <form id="form-cambio" method="dialog">
+      <h2>Cambio de producto</h2>
+      <p class="dlg-sub"></p>
+      <label>Nuevo producto <input name="nuevo_producto" required></label>
+      <label>Nuevo número serial <input name="nuevo_numero_serial" required></label>
+      <label class="check"><input name="cambio_erp" type="checkbox" required> <span>Ya hice el cambio en el ERP de ENJOY</span></label>
+      <p class="error" role="alert" hidden></p>
+      <div class="dlg-acciones">
+        <button class="sutil" type="button" data-cerrar>Cancelar</button>
+        <button class="primario" type="submit">Guardar cambio</button>
+      </div>
+    </form>
   </dialog>
 
   <!-- Confirmar eliminación -->

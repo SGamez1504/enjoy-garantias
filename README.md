@@ -16,6 +16,10 @@ Tabla para llevar cada caso de garantía desde que el producto llega a la tienda
 
 Los estados excepcionales, **Pedido producto reposición** y **Cambio de producto**, se marcan desde el detalle del caso (clic en el número `#`). Todo cambio de estado queda en el historial con fecha y usuario. En ese mismo detalle están **Editar**, para corregir errores, y **Eliminar**, que pide confirmación y borra de forma definitiva el caso, su historial, la guía y las fotos.
 
+**Número de caso:** es `G-EVG-<número de pedido>` y lo asigna la base de datos. Si un pedido tiene más de un caso, los siguientes quedan como `G-EVG-<pedido>-2`, `-3`, etc.
+
+**Cambio de producto:** pide el nuevo producto, el nuevo serial y marcar que el cambio ya se hizo en el ERP de ENJOY. El producto original se conserva en el caso.
+
 La página funciona en computador, tablet y celular. En pantallas de hasta 1100 px cada caso se muestra como una tarjeta.
 
 ## Constancia de recepción

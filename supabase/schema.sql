@@ -3,6 +3,7 @@
 
 create table public.casos (
   id               bigint generated always as identity primary key,
+  numero_caso      text not null,
 
   -- Apertura del caso
   numero_pedido    text not null,
@@ -21,11 +22,24 @@ create table public.casos (
   fotos_envio      text[] not null default '{}',
   fecha_devolucion date,
 
+  -- Solo en un cambio de producto
+  nuevo_producto        text,
+  nuevo_numero_serial   text,
+  cambio_erp_confirmado boolean not null default false,
+
   estado           text not null default 'recibido_tienda',
 
   created_at       timestamptz not null default now(),
   updated_at       timestamptz not null default now(),
 
+  constraint casos_numero_caso_unico unique (numero_caso),
+  constraint casos_cambio_completo check (
+    estado <> 'cambio_producto' or (
+      length(trim(coalesce(nuevo_producto, ''))) > 0
+      and length(trim(coalesce(nuevo_numero_serial, ''))) > 0
+      and cambio_erp_confirmado
+    )
+  ),
   constraint casos_apertura_completa check (
     length(trim(numero_pedido)) > 0 and length(trim(cliente_nombre)) > 0
     and length(trim(cliente_numero)) > 0 and length(trim(producto)) > 0
@@ -51,6 +65,35 @@ create table public.casos (
 );
 
 create index casos_estado_idx on public.casos (estado);
+
+-- Número de caso: G-EVG-<pedido>. El segundo caso de un mismo pedido queda como G-EVG-<pedido>-2.
+create function public.asignar_numero_caso() returns trigger
+language plpgsql set search_path = '' as $$
+declare
+  base text;
+  candidato text;
+  n int := 1;
+begin
+  -- El número solo cambia si cambia el pedido; no se puede fijar a mano.
+  if tg_op = 'UPDATE' and new.numero_pedido is not distinct from old.numero_pedido then
+    new.numero_caso := old.numero_caso;
+    return new;
+  end if;
+
+  base := 'G-EVG-' || regexp_replace(trim(new.numero_pedido), '^#+\s*', '');
+  candidato := base;
+  while exists (select 1 from public.casos where numero_caso = candidato and id is distinct from new.id) loop
+    n := n + 1;
+    candidato := base || '-' || n;
+  end loop;
+  new.numero_caso := candidato;
+  return new;
+end;
+$$;
+
+create trigger casos_numero_caso
+  before insert or update on public.casos
+  for each row execute function public.asignar_numero_caso();
 
 -- Tracking: cada cambio de estado queda registrado con fecha y usuario.
 create table public.caso_historial (

@@ -27,6 +27,8 @@ const MENSAJES = [
   ['casos_devolucion_orden', 'El recibido de fábrica no puede ser anterior a la fecha de envío.'],
   ['casos_apertura_completa', 'Todos los datos de apertura son obligatorios.'],
   ['casos_recibido_por', 'Indica quién recibió el producto.'],
+  ['casos_cambio_completo', 'El cambio de producto necesita el nuevo producto, el nuevo serial y confirmar el cambio en el ERP.'],
+  ['casos_numero_caso_unico', 'Otra persona acaba de usar ese número de caso. Intenta guardar de nuevo.'],
   ['Invalid login credentials', 'Correo o contraseña incorrectos.'],
   ['Failed to fetch', 'No hay conexión con la base de datos. Intenta de nuevo.'],
   ['JWT expired', 'La sesión expiró. Vuelve a entrar.'],
@@ -289,7 +291,7 @@ function pintar() {
   const visibles = casos.filter((c) => {
     if (filtroEstado !== 'todos' && c.estado !== filtroEstado) return false;
     if (!q) return true;
-    return normalizar([c.id, c.numero_pedido, c.cliente_nombre, c.cliente_numero, c.producto, c.numero_serial, c.falla, c.recibido_por].join(' ')).includes(q);
+    return normalizar([c.numero_caso, c.numero_pedido, c.cliente_nombre, c.cliente_numero, c.producto, c.numero_serial, c.falla, c.recibido_por, c.nuevo_producto, c.nuevo_numero_serial].join(' ')).includes(q);
   });
 
   $('#filas').replaceChildren(...visibles.map(fila));
@@ -362,11 +364,11 @@ function fila(c) {
   return h('tr', {},
     h('td', { class: 'id', 'data-label': 'Caso' }, h('button', {
       class: 'enlace', type: 'button', title: 'Ver detalle', onclick: () => abrirDetalle(c),
-    }, `#${c.id}`)),
-    celda('Pedido', {}, c.numero_pedido),
+    }, c.numero_caso)),
     celda('Cliente', {}, h('div', {}, c.cliente_nombre), secundario(c.cliente_numero)),
     celda('Recibido', { class: 'fecha' }, h('div', {}, fecha(c.fecha_recibido)), secundario(c.recibido_por)),
-    celda('Producto', {}, h('div', {}, c.producto), secundario(c.numero_serial)),
+    celda('Producto', {}, h('div', {}, c.producto), secundario(c.numero_serial),
+      c.nuevo_producto && secundario(`Cambiado por: ${c.nuevo_producto} (${c.nuevo_numero_serial})`)),
     celda('Falla', { class: 'falla', title: c.falla }, c.falla),
     celda('Fecha envío', { class: 'fecha' }, envio),
     celda('Evidencia', {}, evidencia),
@@ -385,7 +387,7 @@ function abrirEnvio(c) {
   fotosEnvio.limpiar();
   mostrarError(dlg, null);
   form.dataset.id = c.id;
-  dlg.querySelector('.dlg-sub').textContent = `Caso #${c.id} · ${c.producto} · ${c.cliente_nombre}`;
+  dlg.querySelector('.dlg-sub').textContent = `${c.numero_caso} · ${c.producto} · ${c.cliente_nombre}`;
   form.fecha_envio.value = hoy();
   form.fecha_envio.min = c.fecha_recibido;
   dlg.showModal();
@@ -397,17 +399,17 @@ function abrirDevolucion(c) {
   form.reset();
   mostrarError(dlg, null);
   form.dataset.id = c.id;
-  dlg.querySelector('.dlg-sub').textContent = `Caso #${c.id} · ${c.producto} · ${c.cliente_nombre}`;
+  dlg.querySelector('.dlg-sub').textContent = `${c.numero_caso} · ${c.producto} · ${c.cliente_nombre}`;
   form.fecha_devolucion.value = hoy();
   form.fecha_devolucion.min = c.fecha_envio;
   dlg.showModal();
 }
 
 async function entregar(c) {
-  if (!confirm(`¿Marcar el caso #${c.id} como entregado al cliente?`)) return;
+  if (!confirm(`¿Marcar el caso ${c.numero_caso} como entregado al cliente?`)) return;
   try {
     await actualizar(c.id, { estado: 'entregado_cliente' });
-    aviso(`Caso #${c.id} entregado al cliente.`);
+    aviso(`Caso ${c.numero_caso} entregado al cliente.`);
   } catch (err) {
     aviso(traducir(err));
   }
@@ -432,6 +434,8 @@ function abrirNuevo() {
   $('#campos-edicion').hidden = true;
   form.fecha_recibido.value = hoy();
   form.recibido_por.value = leerRecibe();
+  delete form.dataset.tieneCambio;
+  actualizarCamposCambio();
   dlg.showModal();
 }
 
@@ -442,13 +446,28 @@ function abrirEdicion(c) {
   fotosEdicion.limpiar();
   mostrarError(dlg, null);
   form.dataset.id = c.id;
-  $('#dlg-caso-titulo').textContent = `Editar caso #${c.id}`;
+  $('#dlg-caso-titulo').textContent = `Editar caso ${c.numero_caso}`;
   $('#campos-edicion').hidden = false;
   for (const campo of ['numero_pedido', 'fecha_recibido', 'recibido_por', 'cliente_nombre', 'cliente_numero', 'producto',
-    'numero_serial', 'falla', 'estado', 'fecha_envio', 'fecha_devolucion']) {
+    'numero_serial', 'falla', 'estado', 'fecha_envio', 'fecha_devolucion', 'nuevo_producto', 'nuevo_numero_serial']) {
     form[campo].value = c[campo] ?? '';
   }
+  form.cambio_erp.checked = c.cambio_erp_confirmado;
+  if (c.nuevo_producto) form.dataset.tieneCambio = 'si';
+  else delete form.dataset.tieneCambio;
+  actualizarCamposCambio();
   dlg.showModal();
+}
+
+// En la edición, los datos del cambio se piden al elegir ese estado y siguen visibles
+// si el caso ya los tiene, para poder corregirlos después de entregarlo.
+function actualizarCamposCambio() {
+  const form = $('#form-caso');
+  const esCambio = form.estado.value === 'cambio_producto' && !$('#campos-edicion').hidden;
+  $('#campos-cambio').hidden = !esCambio && !form.dataset.tieneCambio;
+  form.nuevo_producto.required = esCambio;
+  form.nuevo_numero_serial.required = esCambio;
+  form.cambio_erp.required = esCambio;
 }
 
 async function guardarCaso(datos) {
@@ -464,7 +483,7 @@ async function guardarCaso(datos) {
     if (error) throw error;
     guardarRecibe(apertura.recibido_por);
     await cargar();
-    aviso(`Caso #${data.id} abierto. Ya puedes generar la constancia.`);
+    aviso(`Caso ${data.numero_caso} abierto. Ya puedes generar la constancia.`);
     // Lo normal es entregarle la constancia al cliente en este momento.
     setTimeout(() => abrirDetalle(data), 0);
     return;
@@ -478,6 +497,11 @@ async function guardarCaso(datos) {
     fecha_envio: datos.get('fecha_envio') || null,
     fecha_devolucion: datos.get('fecha_devolucion') || null,
   };
+  if (!$('#campos-cambio').hidden) {
+    cambios.nuevo_producto = datos.get('nuevo_producto').trim() || null;
+    cambios.nuevo_numero_serial = datos.get('nuevo_numero_serial').trim() || null;
+    cambios.cambio_erp_confirmado = datos.get('cambio_erp') === 'on';
+  }
   const pdf = datos.get('guia');
   const fotos = await fotosEdicion.blobs();
 
@@ -494,7 +518,7 @@ async function guardarCaso(datos) {
     if (fotos.length) cambios.fotos_envio = await subirFotos(id, fotos);
   }
   await actualizar(id, cambios);
-  aviso(`Caso #${id} actualizado.`);
+  aviso(`Caso ${casos.find((c) => c.id === id)?.numero_caso ?? ''} actualizado.`);
 }
 
 // ---------- Detalle ----------
@@ -502,7 +526,7 @@ async function guardarCaso(datos) {
 async function abrirDetalle(c) {
   const dlg = $('#dlg-detalle');
   mostrarError(dlg, null);
-  $('#det-titulo').textContent = `Caso #${c.id}`;
+  $('#det-titulo').textContent = c.numero_caso;
 
   const filas = [
     ['Pedido', c.numero_pedido],
@@ -510,6 +534,11 @@ async function abrirDetalle(c) {
     ['Número cliente', c.cliente_numero],
     ['Producto', c.producto],
     ['Serial', c.numero_serial],
+    ...(c.nuevo_producto ? [
+      ['Nuevo producto', c.nuevo_producto],
+      ['Nuevo serial', c.nuevo_numero_serial],
+      ['Cambio en ERP', c.cambio_erp_confirmado ? 'Confirmado' : 'Sin confirmar'],
+    ] : []),
     ['Falla', c.falla],
     ['Recibido', fecha(c.fecha_recibido)],
     ['Recibido por', c.recibido_por],
@@ -571,14 +600,31 @@ async function pintarFotosDetalle(c) {
 
 async function marcarExcepcion(c, estado) {
   const dlg = $('#dlg-detalle');
-  if (!confirm(`¿Cambiar el caso #${c.id} a "${ESTADOS[estado]}"?`)) return;
+  if (estado === 'cambio_producto') {
+    dlg.close();
+    abrirCambio(c);
+    return;
+  }
+  if (!confirm(`¿Cambiar el caso ${c.numero_caso} a "${ESTADOS[estado]}"?`)) return;
   try {
     await actualizar(c.id, { estado });
     dlg.close();
-    aviso(`Caso #${c.id}: ${ESTADOS[estado]}.`);
+    aviso(`Caso ${c.numero_caso}: ${ESTADOS[estado]}.`);
   } catch (err) {
     mostrarError(dlg, err);
   }
+}
+
+function abrirCambio(c) {
+  const dlg = $('#dlg-cambio');
+  const form = $('#form-cambio');
+  form.reset();
+  mostrarError(dlg, null);
+  form.dataset.id = c.id;
+  dlg.querySelector('.dlg-sub').textContent = `${c.numero_caso} · Producto actual: ${c.producto} (${c.numero_serial})`;
+  form.nuevo_producto.value = c.nuevo_producto ?? '';
+  form.nuevo_numero_serial.value = c.nuevo_numero_serial ?? '';
+  dlg.showModal();
 }
 
 // ---------- Eliminar ----------
@@ -588,7 +634,7 @@ function abrirEliminar(c) {
   const form = $('#form-eliminar');
   mostrarError(dlg, null);
   form.dataset.id = c.id;
-  $('#elim-titulo').textContent = `¿Eliminar el caso #${c.id}?`;
+  $('#elim-titulo').textContent = `¿Eliminar el caso ${c.numero_caso}?`;
   $('#elim-detalle').textContent = `Pedido ${c.numero_pedido} · ${c.producto} · ${c.cliente_nombre}`;
   dlg.showModal();
 }
@@ -603,6 +649,7 @@ async function archivosDelCaso(bucket, id) {
 // habría un caso con su guía o sus fotos a medio borrar.
 async function eliminarCaso() {
   const id = Number($('#form-eliminar').dataset.id);
+  const numero = casos.find((c) => c.id === id)?.numero_caso ?? '';
   const guias = await archivosDelCaso('guias', id);
   const fotos = await archivosDelCaso('evidencias', id);
 
@@ -616,8 +663,8 @@ async function eliminarCaso() {
   ]);
   await cargar();
   aviso(resultados.some((r) => r.error)
-    ? `Caso #${id} eliminado, pero algunos archivos no se pudieron borrar.`
-    : `Caso #${id} eliminado.`);
+    ? `Caso ${numero} eliminado, pero algunos archivos no se pudieron borrar.`
+    : `Caso ${numero} eliminado.`);
 }
 
 // ---------- Sesión y arranque ----------
@@ -663,14 +710,27 @@ function iniciar() {
     const guia = await subirGuia(id, datos.get('guia'));
     const fotos_envio = await subirFotos(id, blobs);
     await actualizar(id, { fecha_envio: datos.get('fecha_envio'), ...guia, fotos_envio, estado: 'enviado_fabrica' });
-    aviso(`Caso #${id} enviado a fábrica.`);
+    aviso(`Caso ${casos.find((c) => c.id === id)?.numero_caso ?? ''} enviado a fábrica.`);
   });
 
   alEnviar($('#form-devolucion'), async (datos) => {
     const id = Number($('#form-devolucion').dataset.id);
     await actualizar(id, { fecha_devolucion: datos.get('fecha_devolucion'), estado: 'devuelto_tienda' });
-    aviso(`Caso #${id} devuelto a tienda.`);
+    aviso(`Caso ${casos.find((c) => c.id === id)?.numero_caso ?? ''} devuelto a tienda.`);
   });
+
+  alEnviar($('#form-cambio'), async (datos) => {
+    const id = Number($('#form-cambio').dataset.id);
+    await actualizar(id, {
+      estado: 'cambio_producto',
+      nuevo_producto: datos.get('nuevo_producto').trim(),
+      nuevo_numero_serial: datos.get('nuevo_numero_serial').trim(),
+      cambio_erp_confirmado: datos.get('cambio_erp') === 'on',
+    });
+    aviso(`Caso ${casos.find((c) => c.id === id)?.numero_caso ?? ''}: cambio de producto registrado.`);
+  });
+
+  $('#form-caso').estado.addEventListener('change', actualizarCamposCambio);
 
   document.querySelectorAll('[data-cerrar]').forEach((b) =>
     b.addEventListener('click', () => b.closest('dialog').close()));

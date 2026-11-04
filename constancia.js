@@ -245,7 +245,7 @@ async function construirConstancia(c) {
       color(PDF_COLOR.tenue);
       doc.text(EMPRESA.direccion, M, ALTO - 22);
       doc.text(`WhatsApp ${EMPRESA.whatsapp} · ${EMPRESA.correo} · ${EMPRESA.web}`, M, ALTO - 12);
-      doc.text(`Caso #${c.id} · Página ${n} de ${total}`, ANCHO - M, ALTO - 32, { align: 'right' });
+      doc.text(`${c.numero_caso} · Página ${n} de ${total}`, ANCHO - M, ALTO - 32, { align: 'right' });
     }
   }
 
@@ -254,7 +254,7 @@ async function construirConstancia(c) {
 
   fuente('bold', 11);
   color(PDF_COLOR.negro);
-  doc.text(`Caso de garantía #${c.id}`, M, y);
+  doc.text(`Caso de garantía ${c.numero_caso}`, M, y);
   fuente('normal', 9);
   color(PDF_COLOR.tenue);
   doc.text(`Fecha de emisión: ${fechaDeHoy()}`, ANCHO - M, y, { align: 'right' });
@@ -337,7 +337,7 @@ async function construirConstancia(c) {
 
   piesDePagina();
   doc.setProperties({
-    title: `Constancia de recepción - Caso ${c.id}`,
+    title: `Constancia de recepción - ${c.numero_caso}`,
     author: EMPRESA.nombre,
     subject: 'Recepción de producto en garantía',
   });
@@ -346,5 +346,5 @@ async function construirConstancia(c) {
 
 async function generarConstancia(c) {
   const doc = await construirConstancia(c);
-  doc.save(`constancia-caso-${c.id}.pdf`);
+  doc.save(`constancia-${c.numero_caso}.pdf`);
 }

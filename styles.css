@@ -52,7 +52,6 @@ body {
 h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
 h2 { font-size: 17px; margin: 0 0 4px; }
 h3 { font-size: 13px; margin: 18px 0 8px; color: var(--tenue); font-weight: 600; }
-.marca { margin: 0; font-size: 12px; font-weight: 600; color: var(--acento); }
 
 input, select, textarea, button { font: inherit; color: inherit; }
 input, select, textarea {
@@ -96,15 +95,23 @@ button:disabled { opacity: .6; cursor: not-allowed; }
   display: grid; gap: 14px;
   background: var(--panel); border: 1px solid var(--linea); border-radius: 10px;
 }
-.tarjeta h1 { margin-top: -10px; }
 .tarjeta p { margin: 0; }
 
+/* Franja negra siempre: el logo es blanco, como en la tienda y la constancia. */
 .barra {
   display: flex; flex-wrap: wrap; gap: 12px;
   justify-content: space-between; align-items: center;
-  padding: 16px 20px 10px;
+  margin-bottom: 14px; padding: 10px 20px;
+  color: #fff; background: #111; border-bottom: 3px solid #f4560a;
 }
+.barra-marca { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.barra-marca h1 { font-size: 17px; }
+.logo { display: block; flex: none; width: 106px; height: auto; }
 .barra-acciones { display: flex; gap: 8px; }
+.barra .sutil { border-color: #55555f; }
+.barra .sutil:hover { background: #2a2a31; }
+.login-logo { margin: -24px -24px 2px; padding: 18px; background: #111; border-bottom: 3px solid #f4560a; border-radius: 9px 9px 0 0; }
+.login-logo img { display: block; margin: 0 auto; width: 150px; height: auto; }
 
 .filtros { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; padding: 0 20px 12px; }
 .filtros input { max-width: 340px; }
@@ -129,7 +136,7 @@ th { font-size: 11.5px; font-weight: 600; color: var(--tenue); background: var(-
 td { white-space: nowrap; }
 td.falla { max-width: 125px; overflow: hidden; text-overflow: ellipsis; }
 td.fecha, td.id { font-variant-numeric: tabular-nums; }
-.secundario { display: block; color: var(--tenue); font-size: 12px; font-variant-numeric: normal; }
+.secundario { display: block; max-width: 190px; color: var(--tenue); font-size: 12px; font-variant-numeric: normal; white-space: normal; overflow-wrap: anywhere; }
 .evidencia { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; }
 .fija {
   position: sticky; right: 0; background: var(--panel);
@@ -166,7 +173,9 @@ dialog {
 }
 dialog::backdrop { background: rgb(10 10 20 / .45); }
 dialog form { display: grid; gap: 12px; }
-#dlg-envio, #dlg-devolucion, #dlg-eliminar { width: min(440px, calc(100vw - 32px)); }
+#dlg-envio, #dlg-devolucion, #dlg-eliminar, #dlg-cambio { width: min(440px, calc(100vw - 32px)); }
+.check { display: flex; align-items: flex-start; gap: 10px; padding: 10px; font-size: 14px; color: var(--texto); background: var(--panel-2); border: 1px solid var(--linea); border-radius: 6px; }
+label.check > input { flex: none; width: 20px; height: 20px; margin: 0; padding: 0; }
 .dlg-sub { margin: -10px 0 0; color: var(--tenue); }
 .dlg-texto { margin: 0; }
 .rejilla { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
@@ -218,7 +227,8 @@ dd .enlace { white-space: normal; overflow-wrap: anywhere; }
   .chip { min-height: 34px; }
   .quitar { min-height: 0; }
 
-  .barra { padding: 14px 16px 10px; }
+  .barra { padding: 10px 16px; }
+  .secundario { max-width: none; }
   .filtros { padding: 0 16px 12px; }
   .filtros input { max-width: none; }
   /* Los filtros se deslizan en una sola línea para no empujar los casos hacia abajo. */
@@ -261,7 +271,7 @@ dd .enlace { white-space: normal; overflow-wrap: anywhere; }
 
 @media (max-width: 640px) {
   /* Los formularios ocupan toda la pantalla. */
-  dialog, #dlg-envio, #dlg-devolucion, #dlg-eliminar {
+  dialog, #dlg-envio, #dlg-devolucion, #dlg-eliminar, #dlg-cambio {
     width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh;
     margin: 0; padding: 16px; border: 0; border-radius: 0;
   }
