@@ -34,7 +34,7 @@ En **Project Settings > API** copia la URL y la clave pública (`anon` / `publis
 1. Crea un repositorio en GitHub y sube este proyecto.
 2. En **Settings > Pages**, elige **Deploy from a branch**, rama `main`, carpeta `/ (root)`.
 
-Pages publica en internet incluso con un plan pago si el repositorio es público, y el plan gratis de GitHub exige que lo sea. No hay datos de clientes en el repositorio: esos viven en Supabase, detrás del inicio de sesión.
+En el plan gratis de GitHub, Pages exige que el repositorio sea público, y la dirección de la página queda abierta en internet. No hay datos de clientes en el repositorio ni en la página: viven en Supabase, detrás del inicio de sesión.
 
 ## Respaldos y plan gratis
 
