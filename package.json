@@ -1,0 +1,15 @@
+{
+  "name": "enjoy-garantias",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/schema.test.mjs",
+    "demo": "node tests/demo-server.mjs"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.15"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.119.0"
+  }
+}

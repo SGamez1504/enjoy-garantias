@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Garantías · Enjoy Videogames</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- Falta configurar -->
+  <main id="vista-config" class="centrado" hidden>
+    <div class="tarjeta">
+      <h1>Falta conectar la base de datos</h1>
+      <p>Pon la URL y la clave pública de Supabase en <code>config.js</code>. Los pasos están en el README.</p>
+    </div>
+  </main>
+
+  <!-- Inicio de sesión -->
+  <main id="vista-login" class="centrado" hidden>
+    <form id="form-login" class="tarjeta">
+      <p class="marca">Enjoy Videogames</p>
+      <h1>Control de garantías</h1>
+      <label>Correo <input name="email" type="email" autocomplete="username" required></label>
+      <label>Contraseña <input name="password" type="password" autocomplete="current-password" required></label>
+      <p class="error" id="login-error" role="alert" hidden></p>
+      <button class="primario" type="submit">Entrar</button>
+    </form>
+  </main>
+
+  <!-- Sistema -->
+  <div id="vista-app" hidden>
+    <header class="barra">
+      <div>
+        <p class="marca">Enjoy Videogames</p>
+        <h1>Control de garantías</h1>
+      </div>
+      <div class="barra-acciones">
+        <button class="primario" id="btn-nuevo" type="button">+ Nuevo caso</button>
+        <button class="sutil" id="btn-salir" type="button">Salir</button>
+      </div>
+    </header>
+
+    <section class="filtros" aria-label="Filtros">
+      <input id="buscar" type="search" placeholder="Buscar pedido, cliente, producto o serial" aria-label="Buscar">
+      <div id="chips" class="chips" role="group" aria-label="Filtrar por estado"></div>
+    </section>
+
+    <div class="tabla-marco">
+      <table>
+        <thead>
+          <tr>
+            <th>Caso</th>
+            <th>Pedido</th>
+            <th>Cliente</th>
+            <th>Número cliente</th>
+            <th>Recibido</th>
+            <th>Producto</th>
+            <th>Serial</th>
+            <th>Falla</th>
+            <th>Fecha envío</th>
+            <th>Guía</th>
+            <th>Recibido de fábrica</th>
+            <th class="fija">Estado</th>
+          </tr>
+        </thead>
+        <tbody id="filas"></tbody>
+      </table>
+      <p id="vacio" class="vacio" hidden></p>
+    </div>
+  </div>
+
+  <!-- Abrir / editar caso -->
+  <dialog id="dlg-caso">
+    <form id="form-caso" method="dialog">
+      <h2 id="dlg-caso-titulo">Nuevo caso</h2>
+      <div class="rejilla">
+        <label>Número de pedido <input name="numero_pedido" required></label>
+        <label>Fecha de recibido <input name="fecha_recibido" type="date" required></label>
+        <label>Nombre del cliente <input name="cliente_nombre" required></label>
+        <label>Número del cliente <input name="cliente_numero" required></label>
+        <label>Producto <input name="producto" required></label>
+        <label>Número serial <input name="numero_serial" required></label>
+        <label class="ancho">Falla <textarea name="falla" rows="2" required></textarea></label>
+      </div>
+      <fieldset id="campos-edicion" hidden>
+        <legend>Seguimiento</legend>
+        <div class="rejilla">
+          <label>Estado <select name="estado"></select></label>
+          <label>Fecha de envío <input name="fecha_envio" type="date"></label>
+          <label>Recibido de fábrica <input name="fecha_devolucion" type="date"></label>
+          <label>Reemplazar guía (PDF) <input name="guia" type="file" accept="application/pdf,.pdf"></label>
+        </div>
+        <p class="ayuda">Si borras la fecha de envío, el caso también deja de tener guía.</p>
+      </fieldset>
+      <p class="error" role="alert" hidden></p>
+      <div class="dlg-acciones">
+        <button class="sutil" type="button" data-cerrar>Cancelar</button>
+        <button class="primario" type="submit">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Registrar envío -->
+  <dialog id="dlg-envio">
+    <form id="form-envio" method="dialog">
+      <h2>Registrar envío a fábrica</h2>
+      <p class="dlg-sub"></p>
+      <label>Fecha de envío <input name="fecha_envio" type="date" required></label>
+      <label>Guía en PDF <input name="guia" type="file" accept="application/pdf,.pdf" required></label>
+      <p class="error" role="alert" hidden></p>
+      <div class="dlg-acciones">
+        <button class="sutil" type="button" data-cerrar>Cancelar</button>
+        <button class="primario" type="submit">Guardar envío</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Registrar recibido de fábrica -->
+  <dialog id="dlg-devolucion">
+    <form id="form-devolucion" method="dialog">
+      <h2>Registrar recibido de fábrica</h2>
+      <p class="dlg-sub"></p>
+      <label>Fecha de recibido <input name="fecha_devolucion" type="date" required></label>
+      <p class="error" role="alert" hidden></p>
+      <div class="dlg-acciones">
+        <button class="sutil" type="button" data-cerrar>Cancelar</button>
+        <button class="primario" type="submit">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Detalle del caso -->
+  <dialog id="dlg-detalle">
+    <div class="detalle">
+      <h2 id="det-titulo"></h2>
+      <dl id="det-datos"></dl>
+      <h3>Historial</h3>
+      <ol id="det-historial" class="historial"></ol>
+      <p class="error" role="alert" hidden></p>
+      <div class="dlg-acciones" id="det-acciones"></div>
+    </div>
+  </dialog>
+
+  <div id="aviso" class="aviso" role="status" hidden></div>
+
+  <script src="vendor/supabase.js"></script>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
