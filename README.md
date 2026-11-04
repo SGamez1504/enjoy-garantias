@@ -14,7 +14,7 @@ Tabla para llevar cada caso de garantía desde que el producto llega a la tienda
 | 3. Registrar recibido | Fecha en que vuelve de fábrica | Devuelto a tienda |
 | 4. Entregar | Un clic | Entregado al cliente |
 
-Los estados excepcionales, **Pedido producto reposición** y **Cambio de producto**, se marcan desde el detalle del caso (clic en el número `#`). Todo cambio de estado queda en el historial con fecha y usuario. En ese mismo detalle están **Editar**, para corregir errores, y **Eliminar**, que pide confirmación y borra de forma definitiva el caso, su historial, la guía y las fotos.
+Los estados excepcionales, **Pedido producto reposición** y **Cambio de producto**, se marcan desde el detalle del caso (clic en el número de caso). Todo cambio de estado queda en el historial con fecha y usuario. En ese mismo detalle están **Editar**, para corregir errores, y **Eliminar**, que pide confirmación y borra de forma definitiva el caso, su historial, la guía y las fotos.
 
 **Número de caso:** es `G-EVG-<número de pedido>` y lo asigna la base de datos. Si un pedido tiene más de un caso, los siguientes quedan como `G-EVG-<pedido>-2`, `-3`, etc.
 
@@ -24,7 +24,7 @@ La página funciona en computador, tablet y celular. En pantallas de hasta 1100 
 
 ## Constancia de recepción
 
-**Generar PDF** descarga un documento para entregar al cliente con los datos del caso, la fecha de recibido, quién lo recibió, un espacio para firmas y un resumen de la política de garantía. A propósito no incluye el estado del caso.
+**Generar PDF** descarga un documento para entregar al cliente con los datos del caso, la fecha de recibido, quién lo recibió y un resumen de la política de garantía. A propósito no incluye el estado del caso.
 
 El resumen de la política está en `constancia.js` (`POLITICA`) y resume [la política publicada](https://enjoyvideogames.com.co/garantia/), revisada el 2026-11-04. **Si la política cambia en la web, hay que actualizarlo ahí.** Los datos de la empresa están en `EMPRESA`, en el mismo archivo.
 

@@ -208,29 +208,6 @@ async function construirConstancia(c) {
     }
   }
 
-  const ALTO_FIRMAS = 84;
-
-  function firmas() {
-    y += 34;
-    const ancho = (UTIL - 40) / 2;
-    const dos = M + ancho + 40;
-    doc.setDrawColor(...PDF_COLOR.texto);
-    doc.setLineWidth(0.6);
-    doc.line(M, y, M + ancho, y);
-    doc.line(dos, y, dos + ancho, y);
-    y += 12;
-    fuente('bold', 9);
-    color(PDF_COLOR.texto);
-    doc.text('Recibe por Enjoy Videogames', M, y);
-    doc.text('Entrega el cliente', dos, y);
-    y += 12;
-    fuente('normal', 9);
-    color(PDF_COLOR.tenue);
-    doc.text(c.recibido_por, M, y, { maxWidth: ancho });
-    doc.text(c.cliente_nombre, dos, y, { maxWidth: ancho });
-    y += 10;
-  }
-
   function piesDePagina() {
     const total = doc.getNumberOfPages();
     for (let n = 1; n <= total; n += 1) {
@@ -286,11 +263,6 @@ async function construirConstancia(c) {
   tabla(['Producto', 'Garantía Enjoy'], POLITICA.plazos, [UTIL - 190, 190]);
   parrafo(POLITICA.notaPlazos, { tam: 8.5, tono: PDF_COLOR.tenue });
 
-  // Una falla muy larga puede no dejar espacio: entonces las firmas van al final del
-  // documento, para no dejar una página solo con ellas.
-  const firmasEnPrimeraPagina = y + ALTO_FIRMAS <= LIMITE;
-  if (firmasEnPrimeraPagina) firmas();
-
   // ---------- Página 2: condiciones ----------
   doc.addPage();
   encabezado();
@@ -329,11 +301,6 @@ async function construirConstancia(c) {
   fuente('normal', 9);
   doc.setTextColor(...PDF_COLOR.naranja);
   doc.textWithLink(URL_POLITICA, M + anchoTitulo, y, { url: URL_POLITICA });
-
-  if (!firmasEnPrimeraPagina) {
-    nuevaPaginaSiHaceFalta(ALTO_FIRMAS);
-    firmas();
-  }
 
   piesDePagina();
   doc.setProperties({
