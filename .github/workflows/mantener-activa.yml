@@ -1,0 +1,17 @@
+name: Mantener Supabase activo
+
+on:
+  schedule:
+    - cron: '17 14 * * 1,4' # lunes y jueves
+  workflow_dispatch: # permite correrla a mano desde la pestaña Actions
+
+permissions:
+  contents: read
+
+jobs:
+  consulta:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash scripts/mantener-activa.sh

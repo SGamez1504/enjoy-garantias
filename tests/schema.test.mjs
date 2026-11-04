@@ -112,6 +112,18 @@ test('permisos: anon no ve nada; authenticated crea y edita pero no borra', asyn
   }
 });
 
+test('ping responde ok sin sesión y sigue sin dar acceso a los casos', async () => {
+  await crearCaso();
+  await db.exec('set role anon');
+  try {
+    const { rows } = await db.query('select public.ping() as r');
+    assert.equal(rows[0].r, 'ok');
+    await assert.rejects(db.query('select * from casos'), /permission denied/);
+  } finally {
+    await db.exec('reset role');
+  }
+});
+
 test('el bucket de guías es privado y solo acepta PDF', async () => {
   const { rows } = await db.query(`select * from storage.buckets where id = 'guias'`);
   assert.equal(rows[0].public, false);

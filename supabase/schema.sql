@@ -99,6 +99,19 @@ create policy casos_crear on public.casos for insert to authenticated with check
 create policy casos_editar on public.casos for update to authenticated using (true) with check (true);
 create policy historial_leer on public.caso_historial for select to authenticated using (true);
 
+-- Consulta de la tarea programada que evita la pausa del plan gratis.
+-- Toca la base de datos de verdad, pero solo responde 'ok': no expone ningún dato.
+create function public.ping() returns text
+language plpgsql security definer set search_path = '' as $$
+begin
+  perform 1 from public.casos limit 1;
+  return 'ok';
+end;
+$$;
+
+revoke all on function public.ping() from public;
+grant execute on function public.ping() to anon, authenticated;
+
 -- PDFs de las guías: bucket privado, solo PDF, máximo 10 MB.
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('guias', 'guias', false, 10485760, array['application/pdf']);

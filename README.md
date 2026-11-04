@@ -38,7 +38,10 @@ En el plan gratis de GitHub, Pages exige que el repositorio sea público, y la d
 
 ## Respaldos y plan gratis
 
-- El plan gratis de Supabase **pausa el proyecto tras una semana sin uso** (se reactiva desde su panel) y **no incluye respaldos automáticos**. Para datos de clientes conviene exportar periódicamente o pasar al plan pago.
+- El plan gratis de Supabase **pausa el proyecto tras una semana sin uso** (se reactiva desde su panel). Para evitarlo, la tarea `.github/workflows/mantener-activa.yml` hace una consulta mínima los lunes y jueves, usando los datos de `config.js`. Mientras `config.js` no esté conectado, la tarea termina sin hacer nada.
+  - **Comprobarla:** después de conectar la base de datos, ve a la pestaña **Actions > Mantener Supabase activo > Run workflow**. Debe terminar en verde con el mensaje "Supabase activo".
+  - **Reactivarla:** GitHub desactiva las tareas programadas si el repositorio pasa 60 días sin cambios. Avisa por correo a la cuenta dueña; se reactiva en esa misma pestaña con **Enable workflow**.
+- El plan gratis **no incluye respaldos automáticos**, y la tarea anterior no los reemplaza. Conviene exportar los casos periódicamente o pasar al plan pago.
 - Los casos no se pueden borrar desde la página, a propósito. Si hace falta, se borran desde el panel de Supabase.
 
 ## Desarrollo
