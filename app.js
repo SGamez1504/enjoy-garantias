@@ -688,11 +688,13 @@ function iniciar() {
     const form = ev.target;
     const errorEl = $('#login-error');
     errorEl.hidden = true;
+    guardarDiaSesion(hoyColombia());
     const { error } = await sb.auth.signInWithPassword({
       email: form.email.value.trim(),
       password: form.password.value,
     });
     if (error) {
+      guardarDiaSesion(null);
       errorEl.textContent = traducir(error);
       errorEl.hidden = false;
     } else {
@@ -740,10 +742,45 @@ function iniciar() {
   $('#buscar').addEventListener('input', pintar);
 
   sb.auth.onAuthStateChange((_evento, sesion) => {
+    if (sesion && sesionVencida()) {
+      mostrarVista('vista-login');
+      setTimeout(cerrarPorFinDeDia, 0);
+      return;
+    }
     mostrarVista(sesion ? 'vista-app' : 'vista-login');
     // Fuera del callback: supabase-js se traba si se le consulta desde aquí mismo.
     if (sesion) setTimeout(cargar, 0);
   });
+
+  setInterval(() => { if (!$('#vista-app').hidden && sesionVencida()) cerrarPorFinDeDia(); }, 30000);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && !$('#vista-app').hidden && sesionVencida()) cerrarPorFinDeDia();
+  });
+}
+
+/* La sesión dura hasta las 00:00 hora Colombia: cada día hay que volver a entrar. */
+const CLAVE_DIA = 'enjoy.diaSesion';
+function hoyColombia() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(new Date());
+}
+function guardarDiaSesion(dia) {
+  try { dia ? localStorage.setItem(CLAVE_DIA, dia) : localStorage.removeItem(CLAVE_DIA); } catch { /* sin almacenamiento */ }
+}
+function sesionVencida() {
+  let dia = null;
+  try { dia = localStorage.getItem(CLAVE_DIA); } catch { /* sin almacenamiento */ }
+  return dia !== hoyColombia();
+}
+let cerrandoSesion = false;
+async function cerrarPorFinDeDia() {
+  if (cerrandoSesion) return;
+  cerrandoSesion = true;
+  await sb.auth.signOut();
+  cerrandoSesion = false;
+  mostrarVista('vista-login');
+  const errorEl = $('#login-error');
+  errorEl.textContent = 'Tu sesión terminó a las 00:00 (hora Colombia). Vuelve a entrar.';
+  errorEl.hidden = false;
 }
 
 iniciar();
