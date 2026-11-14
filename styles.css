@@ -12,11 +12,14 @@
   --peligro: #b3261e;
   --peligro-texto: #ffffff;
 
-  --e-recibido: #1f5fa8;   --e-recibido-f: #e3eefb;
-  --e-enviado: #8a5a00;    --e-enviado-f: #fbf0d9;
-  --e-devuelto: #6b3fb5;   --e-devuelto-f: #efe7fb;
-  --e-entregado: #1c7a45;  --e-entregado-f: #e0f4e8;
-  --e-excepcion: #b3261e;  --e-excepcion-f: #fbe6e4;
+  /* Un tono distinto por estado: azul, ámbar, cian, verde, magenta, violeta y rojo. */
+  --e-recibido: #1f5fa8;    --e-recibido-f: #e3eefb;
+  --e-enviado: #8a5a00;     --e-enviado-f: #fbefd5;
+  --e-devuelto: #0b6e78;    --e-devuelto-f: #d9f1f3;
+  --e-entregado: #1c7a3c;   --e-entregado-f: #ddf3e3;
+  --e-reposicion: #a3226b;  --e-reposicion-f: #fbe2ef;
+  --e-cambio: #5a3ab0;      --e-cambio-f: #ebe5fb;
+  --e-reparacion: #b3261e;  --e-reparacion-f: #fbe4e2;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -32,11 +35,13 @@
     --peligro: #f2867e;
     --peligro-texto: #14141a;
 
-    --e-recibido: #8fc0f5;   --e-recibido-f: #1c2c40;
-    --e-enviado: #e8c070;    --e-enviado-f: #38301a;
-    --e-devuelto: #c3a6f2;   --e-devuelto-f: #2d2445;
-    --e-entregado: #80d6a4;  --e-entregado-f: #1a3526;
-    --e-excepcion: #f2a099;  --e-excepcion-f: #40211f;
+    --e-recibido: #8fc0f5;    --e-recibido-f: #1c2c40;
+    --e-enviado: #ebc46e;     --e-enviado-f: #3a3016;
+    --e-devuelto: #6fd6df;    --e-devuelto-f: #13363a;
+    --e-entregado: #7fd79a;   --e-entregado-f: #183622;
+    --e-reposicion: #f39ccb;  --e-reposicion-f: #3e1d2f;
+    --e-cambio: #bba6f5;      --e-cambio-f: #2c2448;
+    --e-reparacion: #f3a097;  --e-reparacion-f: #41201d;
   }
 }
 
@@ -121,6 +126,8 @@ button:disabled { opacity: .6; cursor: not-allowed; }
   background: var(--panel); border: 1px solid var(--linea); border-radius: 999px;
 }
 .chip b { font-weight: 600; color: var(--tenue); margin-left: 3px; }
+.punto { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: currentColor; vertical-align: 1px; }
+.chip[aria-pressed="true"] .punto { box-shadow: 0 0 0 1.5px #fff; }
 .chip[aria-pressed="true"] { background: var(--acento); border-color: var(--acento); color: var(--acento-texto); }
 .chip[aria-pressed="true"] b { color: inherit; }
 
@@ -132,18 +139,19 @@ button:disabled { opacity: .6; cursor: not-allowed; }
 table { width: 100%; border-collapse: separate; border-spacing: 0; }
 th, td { padding: 9px 11px; text-align: left; border-bottom: 1px solid var(--linea); vertical-align: middle; }
 tbody tr:last-child td { border-bottom: 0; }
-th { font-size: 11.5px; font-weight: 600; color: var(--tenue); background: var(--panel-2); }
-td { white-space: nowrap; }
-td.falla { max-width: 125px; overflow: hidden; text-overflow: ellipsis; }
+th { font-size: 11.5px; font-weight: 600; color: var(--tenue); background: var(--panel-2); white-space: nowrap; }
+/* El texto se ajusta en varias líneas en vez de cortarse. */
+td { white-space: normal; overflow-wrap: anywhere; }
+td.id, td.fecha > div:first-child { white-space: nowrap; }
+td[data-label="Cliente"] { min-width: 130px; max-width: 220px; }
+td[data-label="Producto"] { min-width: 170px; max-width: 300px; }
+td.falla { min-width: 160px; max-width: 280px; }
+.pila { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
 td.fecha, td.id { font-variant-numeric: tabular-nums; }
 .secundario { display: block; max-width: 190px; color: var(--tenue); font-size: 12px; font-variant-numeric: normal; white-space: normal; overflow-wrap: anywhere; }
 .evidencia { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; }
-.fija {
-  position: sticky; right: 0; background: var(--panel);
-  border-left: 1px solid var(--linea);
-}
-th.fija { background: var(--panel-2); }
-.estado-celda { display: flex; align-items: center; gap: 10px; justify-content: space-between; min-width: 230px; }
+.estado-celda { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; justify-content: space-between; min-width: 180px; }
+.tracking-bloque { min-width: 0; }
 
 .badge {
   display: inline-block; padding: 2px 8px; border-radius: 5px;
@@ -153,12 +161,16 @@ th.fija { background: var(--panel-2); }
 .e-enviado_fabrica   { color: var(--e-enviado); }
 .e-devuelto_tienda   { color: var(--e-devuelto); }
 .e-entregado_cliente { color: var(--e-entregado); }
-.e-pedido_reposicion, .e-cambio_producto { color: var(--e-excepcion); }
+.e-pedido_reposicion { color: var(--e-reposicion); }
+.e-cambio_producto   { color: var(--e-cambio); }
+.e-reparacion_local  { color: var(--e-reparacion); }
 .badge.e-recibido_tienda   { background: var(--e-recibido-f); }
 .badge.e-enviado_fabrica   { background: var(--e-enviado-f); }
 .badge.e-devuelto_tienda   { background: var(--e-devuelto-f); }
 .badge.e-entregado_cliente { background: var(--e-entregado-f); }
-.badge.e-pedido_reposicion, .badge.e-cambio_producto { background: var(--e-excepcion-f); }
+.badge.e-pedido_reposicion { background: var(--e-reposicion-f); }
+.badge.e-cambio_producto   { background: var(--e-cambio-f); }
+.badge.e-reparacion_local  { background: var(--e-reparacion-f); }
 .fases { display: flex; gap: 3px; margin-top: 5px; }
 .fases i { display: block; width: 100%; height: 3px; border-radius: 2px; background: var(--linea); }
 .fases i.hecha { background: currentColor; }
@@ -254,6 +266,7 @@ dd .enlace { white-space: normal; overflow-wrap: anywhere; }
   }
   td:empty::after { content: "—"; color: var(--tenue); }
   td.falla { grid-column: 1 / -1; max-width: none; overflow: visible; }
+  td[data-label="Cliente"], td[data-label="Producto"], td.falla { min-width: 0; max-width: none; }
   td.id { font-size: 16px; }
   td.id::before { display: none; }
   .fija {
@@ -263,7 +276,7 @@ dd .enlace { white-space: normal; overflow-wrap: anywhere; }
   }
   .fija::before { display: none; }
   .estado-celda { min-width: 0; }
-  .tracking { flex: 1; min-width: 0; }
+  .tracking, .tracking-bloque { flex: 1; min-width: 0; }
   .celda-btn { min-height: 40px; padding: 6px 12px; font-size: 13px; }
   .enlace { min-height: 28px; padding: 3px 0; }
   .evidencia { gap: 0; }

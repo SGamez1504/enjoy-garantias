@@ -31,6 +31,7 @@ const STUBS = `
 const APERTURA = `numero_pedido, cliente_nombre, cliente_numero, fecha_recibido, recibido_por, producto, numero_serial, falla`;
 const VALORES = `'P-1', 'Ana', '3001234567', '2026-11-01', 'Sergio', 'PS5', 'SN1', 'No enciende'`;
 const FOTOS = `array['1/a.jpg']`;
+const VEREDICTO = `veredicto_reparado = true, veredicto_dano = 'Puerto USB-C', veredicto_funcionamiento = 'total'`;
 
 async function crearCaso() {
   const { rows } = await db.query(`insert into casos (${APERTURA}) values (${VALORES}) returning *`);
@@ -75,7 +76,7 @@ test('el envío exige de 1 a 5 fotos', async () => {
 test('flujo completo de las 4 fases deja historial en orden', async () => {
   const { id } = await crearCaso();
   await db.exec(`update casos set fecha_envio = '2026-11-02', guia_path = '${id}/g.pdf', fotos_envio = ${FOTOS}, estado = 'enviado_fabrica' where id = ${id}`);
-  await db.exec(`update casos set fecha_devolucion = '2026-11-10', estado = 'devuelto_tienda' where id = ${id}`);
+  await db.exec(`update casos set fecha_devolucion = '2026-11-10', ${VEREDICTO}, estado = 'devuelto_tienda' where id = ${id}`);
   await db.exec(`update casos set estado = 'entregado_cliente' where id = ${id}`);
   const { rows } = await db.query('select estado from caso_historial where caso_id = $1 order by id', [id]);
   assert.deepEqual(rows.map((r) => r.estado),
@@ -85,9 +86,43 @@ test('flujo completo de las 4 fases deja historial en orden', async () => {
 test('devuelto a tienda exige fecha, y las fechas deben ir en orden', async () => {
   const { id } = await crearCaso();
   await rechaza(`update casos set estado = 'devuelto_tienda' where id = ${id}`, 'casos_devuelto_requiere_fecha');
+  await rechaza(`update casos set fecha_devolucion = '2026-11-04', ${VEREDICTO} where id = ${id}`, 'casos_devolucion_requiere_envio');
   await rechaza(`update casos set fecha_envio = '2026-10-01', guia_path = 'x.pdf', fotos_envio = ${FOTOS} where id = ${id}`, 'casos_envio_orden');
   await db.exec(`update casos set fecha_envio = '2026-11-05', guia_path = 'x.pdf', fotos_envio = ${FOTOS} where id = ${id}`);
-  await rechaza(`update casos set fecha_devolucion = '2026-11-04' where id = ${id}`, 'casos_devolucion_orden');
+  await rechaza(`update casos set fecha_devolucion = '2026-11-04', ${VEREDICTO} where id = ${id}`, 'casos_devolucion_orden');
+});
+
+test('el regreso a tienda exige el veredicto completo', async () => {
+  const { id } = await crearCaso();
+  await db.exec(`update casos set fecha_envio = '2026-11-02', guia_path = 'g.pdf', fotos_envio = ${FOTOS} where id = ${id}`);
+  const r = 'casos_veredicto_completo';
+  await rechaza(`update casos set fecha_devolucion = '2026-11-05' where id = ${id}`, r);
+  await rechaza(`update casos set fecha_devolucion = '2026-11-05', veredicto_reparado = false, veredicto_funcionamiento = 'parcial' where id = ${id}`, r);
+  await rechaza(`update casos set fecha_devolucion = '2026-11-05', veredicto_reparado = false, veredicto_dano = ' ', veredicto_funcionamiento = 'parcial' where id = ${id}`, r);
+  await rechaza(`update casos set fecha_devolucion = '2026-11-05', veredicto_reparado = false, veredicto_dano = 'X', veredicto_funcionamiento = 'medio' where id = ${id}`, 'casos_funcionamiento_valido');
+  await db.exec(`update casos set fecha_devolucion = '2026-11-05', veredicto_reparado = false, veredicto_dano = 'Placa', veredicto_funcionamiento = 'parcial', estado = 'devuelto_tienda' where id = ${id}`);
+});
+
+test('reparación local: lugar y fecha obligatorios; guía solo y siempre con mensajería', async () => {
+  const { id } = await crearCaso();
+  const r = 'casos_reparacion_completa';
+  await rechaza(`update casos set estado = 'reparacion_local' where id = ${id}`, r);
+  await rechaza(`update casos set estado = 'reparacion_local', reparacion_lugar = 'Taller X' where id = ${id}`, r);
+  await rechaza(`update casos set estado = 'reparacion_local', reparacion_lugar = 'Taller X', reparacion_fecha_envio = '2026-11-03', reparacion_mensajeria = true where id = ${id}`, r);
+  await rechaza(`update casos set reparacion_guia_path = 'r.pdf' where id = ${id}`, 'casos_reparacion_guia');
+  await rechaza(`update casos set reparacion_lugar = 'T', reparacion_fecha_envio = '2026-10-01' where id = ${id}`, 'casos_reparacion_orden');
+  // Sin mensajería (llevado en persona) no hace falta guía.
+  await db.exec(`update casos set estado = 'reparacion_local', reparacion_lugar = 'Taller X', reparacion_fecha_envio = '2026-11-03' where id = ${id}`);
+  await rechaza(`update casos set fecha_devolucion = '2026-11-02', ${VEREDICTO} where id = ${id}`, 'casos_devolucion_orden_reparacion');
+  // Regresa de la reparación local sin haber ido a fábrica.
+  await db.exec(`update casos set fecha_devolucion = '2026-11-08', ${VEREDICTO}, estado = 'devuelto_tienda' where id = ${id}`);
+  const { rows } = await db.query('select estado from caso_historial where caso_id = $1 order by id', [id]);
+  assert.deepEqual(rows.map((x) => x.estado), ['recibido_tienda', 'reparacion_local', 'devuelto_tienda']);
+});
+
+test('reparación local por mensajería con guía', async () => {
+  const { id } = await crearCaso();
+  await db.exec(`update casos set estado = 'reparacion_local', reparacion_lugar = 'Taller Y', reparacion_fecha_envio = '2026-11-03', reparacion_mensajeria = true, reparacion_guia_path = '${id}/r.pdf' where id = ${id}`);
 });
 
 test('los estados excepcionales no requieren guía; un estado inventado se rechaza', async () => {

@@ -1,7 +1,16 @@
 'use strict';
 
 const FASES = ['recibido_tienda', 'enviado_fabrica', 'devuelto_tienda', 'entregado_cliente'];
-const EXCEPCIONES = ['pedido_reposicion', 'cambio_producto'];
+const EXCEPCIONES = ['pedido_reposicion', 'cambio_producto', 'reparacion_local'];
+// Estados en los que el siguiente paso es entregarle el producto al cliente.
+const PARA_ENTREGAR = ['devuelto_tienda', 'pedido_reposicion', 'cambio_producto'];
+// Estados en los que el producto está fuera y falta registrar su regreso a tienda.
+const FUERA_DE_TIENDA = ['enviado_fabrica', 'reparacion_local'];
+const FUNCIONAMIENTO = {
+  total: 'Funciona totalmente',
+  parcial: 'Funciona parcialmente',
+  no_funciona: 'No funciona',
+};
 const ESTADOS = {
   recibido_tienda: 'Recibido en tienda',
   enviado_fabrica: 'Enviado a fábrica',
@@ -9,6 +18,7 @@ const ESTADOS = {
   entregado_cliente: 'Entregado al cliente',
   pedido_reposicion: 'Pedido producto reposición',
   cambio_producto: 'Cambio de producto',
+  reparacion_local: 'Reparación local',
 };
 const MAX_PDF = 10 * 1024 * 1024;
 const MAX_FOTOS = 5;
@@ -18,6 +28,13 @@ const POR_PAGINA = 1000;
 const CLAVE_RECIBE = 'garantias.recibido_por';
 
 const MENSAJES = [
+  // Primero los nombres más largos: "casos_devolucion_orden" también está dentro del de reparación.
+  ['casos_devolucion_orden_reparacion', 'El regreso a tienda no puede ser anterior al envío a reparación local.'],
+  ['casos_reparacion_completa', 'La reparación local necesita el lugar, la fecha de envío y, si fue por mensajería, la guía.'],
+  ['casos_reparacion_guia', 'La guía de la reparación solo aplica si se envió por mensajería.'],
+  ['casos_reparacion_orden', 'El envío a reparación no puede ser anterior a la fecha de recibido.'],
+  ['casos_veredicto_completo', 'Para registrar el regreso a tienda indica si se reparó, cuál es el daño y si funciona.'],
+  ['casos_funcionamiento_valido', 'Elige si el producto funciona totalmente, parcialmente o no funciona.'],
   ['casos_envio_con_guia', 'La fecha de envío y la guía van juntas: registra ambas.'],
   ['casos_envio_con_fotos', 'El envío debe tener de 1 a 5 fotos de evidencia.'],
   ['casos_enviado_requiere_guia', 'Para pasar a "Enviado a fábrica" el caso necesita fecha de envío, guía y fotos.'],
@@ -228,10 +245,10 @@ function crearSelectorFotos(contenedor) {
   };
 }
 
-async function abrirGuia(caso) {
+async function abrirGuia(path) {
   // La pestaña se abre antes de la espera; si no, el navegador la bloquea como popup.
   const pestana = window.open('', '_blank');
-  const { data, error } = await sb.storage.from('guias').createSignedUrl(caso.guia_path, 300);
+  const { data, error } = await sb.storage.from('guias').createSignedUrl(path, 300);
   if (error) {
     pestana?.close();
     aviso(traducir(error));
@@ -291,7 +308,7 @@ function pintar() {
   const visibles = casos.filter((c) => {
     if (filtroEstado !== 'todos' && c.estado !== filtroEstado) return false;
     if (!q) return true;
-    return normalizar([c.numero_caso, c.numero_pedido, c.cliente_nombre, c.cliente_numero, c.producto, c.numero_serial, c.falla, c.recibido_por, c.nuevo_producto, c.nuevo_numero_serial].join(' ')).includes(q);
+    return normalizar([c.numero_caso, c.numero_pedido, c.cliente_nombre, c.cliente_numero, c.producto, c.numero_serial, c.falla, c.recibido_por, c.nuevo_producto, c.nuevo_numero_serial, c.reparacion_lugar, c.veredicto_dano].join(' ')).includes(q);
   });
 
   $('#filas').replaceChildren(...visibles.map(fila));
@@ -304,7 +321,7 @@ function pintarChips() {
   const chip = (clave, texto, n) => h('button', {
     class: 'chip', type: 'button', 'aria-pressed': String(filtroEstado === clave),
     onclick: () => { filtroEstado = clave; pintar(); },
-  }, texto, h('b', {}, String(n)));
+  }, clave !== 'todos' && h('i', { class: `punto e-${clave}`, 'aria-hidden': 'true' }), texto, h('b', {}, String(n)));
 
   const contar = (e) => casos.filter((c) => c.estado === e).length;
   $('#chips').replaceChildren(
@@ -328,7 +345,7 @@ function tracking(estado) {
 }
 
 function siguientePaso(c) {
-  if (c.estado === 'devuelto_tienda' || EXCEPCIONES.includes(c.estado)) {
+  if (PARA_ENTREGAR.includes(c.estado)) {
     return h('button', { class: 'celda-btn', type: 'button', onclick: () => entregar(c) }, 'Entregar');
   }
   return null;
@@ -349,15 +366,17 @@ function fila(c) {
       ? h('button', { class: 'celda-btn', type: 'button', onclick: () => abrirEnvio(c) }, 'Registrar envío')
       : null;
 
-  const devolucion = c.fecha_devolucion
-    ? fecha(c.fecha_devolucion)
-    : c.estado === 'enviado_fabrica'
-      ? h('button', { class: 'celda-btn', type: 'button', onclick: () => abrirDevolucion(c) }, 'Registrar recibido')
-      : null;
+  const puedeRegresar = FUERA_DE_TIENDA.includes(c.estado);
+  const devolucion = c.fecha_devolucion || puedeRegresar ? h('div', { class: 'pila' },
+    c.fecha_devolucion && h('div', {}, fecha(c.fecha_devolucion)),
+    c.fecha_devolucion && veredictoCorto(c) && secundario(veredictoCorto(c)),
+    puedeRegresar && h('button', { class: 'celda-btn', type: 'button', onclick: () => abrirDevolucion(c) }, 'Registrar regreso'),
+  ) : null;
 
   const nFotos = c.fotos_envio?.length ?? 0;
-  const evidencia = c.guia_path || nFotos ? h('div', { class: 'evidencia' },
-    c.guia_path && h('button', { class: 'enlace', type: 'button', title: c.guia_nombre, onclick: () => abrirGuia(c) }, 'Guía PDF'),
+  const evidencia = c.guia_path || nFotos || c.reparacion_guia_path ? h('div', { class: 'evidencia' },
+    c.guia_path && h('button', { class: 'enlace', type: 'button', title: c.guia_nombre, onclick: () => abrirGuia(c.guia_path) }, 'Guía PDF'),
+    c.reparacion_guia_path && h('button', { class: 'enlace', type: 'button', title: c.reparacion_guia_nombre, onclick: () => abrirGuia(c.reparacion_guia_path) }, 'Guía reparación'),
     nFotos > 0 && h('button', { class: 'enlace', type: 'button', onclick: () => abrirDetalle(c) }, nFotos === 1 ? '1 foto' : `${nFotos} fotos`),
   ) : null;
 
@@ -372,9 +391,12 @@ function fila(c) {
     celda('Falla', { class: 'falla', title: c.falla }, c.falla),
     celda('Fecha envío', { class: 'fecha' }, envio),
     celda('Evidencia', {}, evidencia),
-    celda('Recibido de fábrica', { class: 'fecha' }, devolucion),
+    celda('Regreso a tienda', { class: 'fecha' }, devolucion),
     celda('Constancia', {}, h('button', { class: 'enlace', type: 'button', onclick: () => descargarConstancia(c) }, 'Generar PDF')),
-    h('td', { class: 'fija', 'data-label': 'Estado' }, h('div', { class: 'estado-celda' }, tracking(c.estado), siguientePaso(c))),
+    h('td', { class: 'fija', 'data-label': 'Estado' }, h('div', { class: 'estado-celda' },
+      h('div', { class: 'tracking-bloque' }, tracking(c.estado),
+        c.estado === 'reparacion_local' && secundario(`En: ${c.reparacion_lugar}`)),
+      siguientePaso(c))),
   );
 }
 
@@ -393,6 +415,11 @@ function abrirEnvio(c) {
   dlg.showModal();
 }
 
+function veredictoCorto(c) {
+  if (c.veredicto_reparado === null || c.veredicto_reparado === undefined) return null;
+  return `${c.veredicto_reparado ? 'Reparado' : 'No reparado'} · ${FUNCIONAMIENTO[c.veredicto_funcionamiento] ?? ''}`;
+}
+
 function abrirDevolucion(c) {
   const dlg = $('#dlg-devolucion');
   const form = $('#form-devolucion');
@@ -401,7 +428,8 @@ function abrirDevolucion(c) {
   form.dataset.id = c.id;
   dlg.querySelector('.dlg-sub').textContent = `${c.numero_caso} · ${c.producto} · ${c.cliente_nombre}`;
   form.fecha_devolucion.value = hoy();
-  form.fecha_devolucion.min = c.fecha_envio;
+  // Puede volver de la fábrica o de la reparación local: no antes del último envío.
+  form.fecha_devolucion.min = [c.fecha_envio, c.reparacion_fecha_envio].filter(Boolean).sort().pop() ?? c.fecha_recibido;
   dlg.showModal();
 }
 
@@ -449,12 +477,16 @@ function abrirEdicion(c) {
   $('#dlg-caso-titulo').textContent = `Editar caso ${c.numero_caso}`;
   $('#campos-edicion').hidden = false;
   for (const campo of ['numero_pedido', 'fecha_recibido', 'recibido_por', 'cliente_nombre', 'cliente_numero', 'producto',
-    'numero_serial', 'falla', 'estado', 'fecha_envio', 'fecha_devolucion', 'nuevo_producto', 'nuevo_numero_serial']) {
+    'numero_serial', 'falla', 'estado', 'fecha_envio', 'fecha_devolucion', 'nuevo_producto', 'nuevo_numero_serial',
+    'reparacion_lugar', 'reparacion_fecha_envio', 'veredicto_dano', 'veredicto_funcionamiento']) {
     form[campo].value = c[campo] ?? '';
   }
   form.cambio_erp.checked = c.cambio_erp_confirmado;
-  if (c.nuevo_producto) form.dataset.tieneCambio = 'si';
-  else delete form.dataset.tieneCambio;
+  form.reparacion_mensajeria.checked = c.reparacion_mensajeria;
+  form.veredicto_reparado.value = c.veredicto_reparado === true ? 'si' : c.veredicto_reparado === false ? 'no' : '';
+  marcar(form, 'tieneCambio', c.nuevo_producto);
+  marcar(form, 'tieneReparacion', c.reparacion_lugar);
+  marcar(form, 'tieneVeredicto', c.veredicto_reparado !== null && c.veredicto_reparado !== undefined);
   actualizarCamposCambio();
   dlg.showModal();
 }
@@ -463,11 +495,47 @@ function abrirEdicion(c) {
 // si el caso ya los tiene, para poder corregirlos después de entregarlo.
 function actualizarCamposCambio() {
   const form = $('#form-caso');
-  const esCambio = form.estado.value === 'cambio_producto' && !$('#campos-edicion').hidden;
+  const editando = !$('#campos-edicion').hidden;
+  const esCambio = editando && form.estado.value === 'cambio_producto';
   $('#campos-cambio').hidden = !esCambio && !form.dataset.tieneCambio;
   form.nuevo_producto.required = esCambio;
   form.nuevo_numero_serial.required = esCambio;
   form.cambio_erp.required = esCambio;
+
+  const esReparacion = editando && form.estado.value === 'reparacion_local';
+  $('#campos-reparacion').hidden = !esReparacion && !form.dataset.tieneReparacion;
+  form.reparacion_lugar.required = esReparacion;
+  form.reparacion_fecha_envio.required = esReparacion;
+  form.querySelector('.campo-reparacion-guia').hidden = !form.reparacion_mensajeria.checked;
+
+  // El veredicto se pide en cuanto el caso tiene fecha de regreso a tienda.
+  const conRegreso = editando && Boolean(form.fecha_devolucion.value);
+  $('#campos-veredicto').hidden = !conRegreso && !form.dataset.tieneVeredicto;
+  form.veredicto_reparado.required = conRegreso;
+  form.veredicto_dano.required = conRegreso;
+  form.veredicto_funcionamiento.required = conRegreso;
+}
+
+function marcar(form, clave, valor) {
+  if (valor) form.dataset[clave] = 'si';
+  else delete form.dataset[clave];
+}
+
+function leerVeredicto(datos) {
+  const reparado = datos.get('veredicto_reparado');
+  return {
+    veredicto_reparado: reparado === 'si' ? true : reparado === 'no' ? false : null,
+    veredicto_dano: datos.get('veredicto_dano').trim() || null,
+    veredicto_funcionamiento: datos.get('veredicto_funcionamiento') || null,
+  };
+}
+
+async function subirGuiaReparacion(casoId, file) {
+  await validarPdf(file);
+  const path = `${casoId}/reparacion-${crypto.randomUUID()}.pdf`;
+  const { error } = await sb.storage.from('guias').upload(path, file, { contentType: 'application/pdf' });
+  if (error) throw error;
+  return { reparacion_guia_path: path, reparacion_guia_nombre: file.name };
 }
 
 async function guardarCaso(datos) {
@@ -501,6 +569,20 @@ async function guardarCaso(datos) {
     cambios.nuevo_producto = datos.get('nuevo_producto').trim() || null;
     cambios.nuevo_numero_serial = datos.get('nuevo_numero_serial').trim() || null;
     cambios.cambio_erp_confirmado = datos.get('cambio_erp') === 'on';
+  }
+  if (!$('#campos-veredicto').hidden) Object.assign(cambios, leerVeredicto(datos));
+  if (!$('#campos-reparacion').hidden) {
+    cambios.reparacion_lugar = datos.get('reparacion_lugar').trim() || null;
+    cambios.reparacion_fecha_envio = datos.get('reparacion_fecha_envio') || null;
+    cambios.reparacion_mensajeria = datos.get('reparacion_mensajeria') === 'on';
+    const guiaRep = datos.get('reparacion_guia');
+    if (!cambios.reparacion_mensajeria) {
+      Object.assign(cambios, { reparacion_guia_path: null, reparacion_guia_nombre: null });
+    } else if (guiaRep?.size) {
+      Object.assign(cambios, await subirGuiaReparacion(id, guiaRep));
+    } else if (!actual?.reparacion_guia_path) {
+      throw new ErrorUsuario('Si la reparación se envió por mensajería, adjunta la guía en PDF.');
+    }
   }
   const pdf = datos.get('guia');
   const fotos = await fotosEdicion.blobs();
@@ -543,8 +625,21 @@ async function abrirDetalle(c) {
     ['Recibido', fecha(c.fecha_recibido)],
     ['Recibido por', c.recibido_por],
     ['Fecha envío', fecha(c.fecha_envio) || '—'],
-    ['Guía', c.guia_path ? h('button', { class: 'enlace', type: 'button', onclick: () => abrirGuia(c) }, c.guia_nombre || 'Ver PDF') : '—'],
-    ['Recibido de fábrica', fecha(c.fecha_devolucion) || '—'],
+    ['Guía', c.guia_path ? h('button', { class: 'enlace', type: 'button', onclick: () => abrirGuia(c.guia_path) }, c.guia_nombre || 'Ver PDF') : '—'],
+    ...(c.reparacion_lugar ? [
+      ['Reparación local en', c.reparacion_lugar],
+      ['Envío a reparación', fecha(c.reparacion_fecha_envio)],
+      ['Por mensajería', c.reparacion_mensajeria ? 'Sí' : 'No'],
+      ...(c.reparacion_guia_path ? [['Guía reparación', h('button', {
+        class: 'enlace', type: 'button', onclick: () => abrirGuia(c.reparacion_guia_path),
+      }, c.reparacion_guia_nombre || 'Ver PDF')]] : []),
+    ] : []),
+    ['Regreso a tienda', fecha(c.fecha_devolucion) || '—'],
+    ...(veredictoCorto(c) ? [
+      ['¿Se reparó?', c.veredicto_reparado ? 'Sí' : 'No'],
+      ['Daño', c.veredicto_dano],
+      ['Funcionamiento', FUNCIONAMIENTO[c.veredicto_funcionamiento] ?? '—'],
+    ] : []),
     ['Estado', badge(c.estado)],
   ];
   $('#det-datos').replaceChildren(...filas.flatMap(([k, v]) => [h('dt', {}, k), h('dd', {}, v)]));
@@ -600,9 +695,9 @@ async function pintarFotosDetalle(c) {
 
 async function marcarExcepcion(c, estado) {
   const dlg = $('#dlg-detalle');
-  if (estado === 'cambio_producto') {
+  if (estado === 'cambio_producto' || estado === 'reparacion_local') {
     dlg.close();
-    abrirCambio(c);
+    (estado === 'cambio_producto' ? abrirCambio : abrirReparacion)(c);
     return;
   }
   if (!confirm(`¿Cambiar el caso ${c.numero_caso} a "${ESTADOS[estado]}"?`)) return;
@@ -613,6 +708,29 @@ async function marcarExcepcion(c, estado) {
   } catch (err) {
     mostrarError(dlg, err);
   }
+}
+
+function abrirReparacion(c) {
+  const dlg = $('#dlg-reparacion');
+  const form = $('#form-reparacion');
+  form.reset();
+  mostrarError(dlg, null);
+  form.dataset.id = c.id;
+  dlg.querySelector('.dlg-sub').textContent = `${c.numero_caso} · ${c.producto} · ${c.cliente_nombre}`;
+  form.reparacion_lugar.value = c.reparacion_lugar ?? '';
+  form.reparacion_fecha_envio.value = c.reparacion_fecha_envio ?? hoy();
+  form.reparacion_fecha_envio.min = c.fecha_recibido;
+  form.reparacion_mensajeria.checked = c.reparacion_mensajeria;
+  actualizarGuiaReparacion(c);
+  dlg.showModal();
+}
+
+// La guía solo se pide si se envió por mensajería; si el caso ya tiene una, no es obligatorio repetirla.
+function actualizarGuiaReparacion(c) {
+  const form = $('#form-reparacion');
+  const conMensajeria = form.reparacion_mensajeria.checked;
+  form.querySelector('.campo-reparacion-guia').hidden = !conMensajeria;
+  form.reparacion_guia.required = conMensajeria && !c?.reparacion_guia_path;
 }
 
 function abrirCambio(c) {
@@ -717,7 +835,7 @@ function iniciar() {
 
   alEnviar($('#form-devolucion'), async (datos) => {
     const id = Number($('#form-devolucion').dataset.id);
-    await actualizar(id, { fecha_devolucion: datos.get('fecha_devolucion'), estado: 'devuelto_tienda' });
+    await actualizar(id, { fecha_devolucion: datos.get('fecha_devolucion'), ...leerVeredicto(datos), estado: 'devuelto_tienda' });
     aviso(`Caso ${casos.find((c) => c.id === id)?.numero_caso ?? ''} devuelto a tienda.`);
   });
 
@@ -733,6 +851,33 @@ function iniciar() {
   });
 
   $('#form-caso').estado.addEventListener('change', actualizarCamposCambio);
+  $('#form-caso').fecha_devolucion.addEventListener('input', actualizarCamposCambio);
+  $('#form-caso').reparacion_mensajeria.addEventListener('change', actualizarCamposCambio);
+
+  const formRep = $('#form-reparacion');
+  formRep.reparacion_mensajeria.addEventListener('change', () =>
+    actualizarGuiaReparacion(casos.find((c) => c.id === Number(formRep.dataset.id))));
+  alEnviar(formRep, async (datos) => {
+    const id = Number(formRep.dataset.id);
+    const actual = casos.find((c) => c.id === id);
+    const cambios = {
+      estado: 'reparacion_local',
+      reparacion_lugar: datos.get('reparacion_lugar').trim(),
+      reparacion_fecha_envio: datos.get('reparacion_fecha_envio'),
+      reparacion_mensajeria: datos.get('reparacion_mensajeria') === 'on',
+      reparacion_guia_path: null,
+      reparacion_guia_nombre: null,
+    };
+    if (cambios.reparacion_mensajeria) {
+      const guia = datos.get('reparacion_guia');
+      if (guia?.size) Object.assign(cambios, await subirGuiaReparacion(id, guia));
+      else if (actual?.reparacion_guia_path) {
+        Object.assign(cambios, { reparacion_guia_path: actual.reparacion_guia_path, reparacion_guia_nombre: actual.reparacion_guia_nombre });
+      } else throw new ErrorUsuario('Si se envió por mensajería, adjunta la guía en PDF.');
+    }
+    await actualizar(id, cambios);
+    aviso(`Caso ${actual?.numero_caso ?? ''}: en reparación local.`);
+  });
 
   document.querySelectorAll('[data-cerrar]').forEach((b) =>
     b.addEventListener('click', () => b.closest('dialog').close()));

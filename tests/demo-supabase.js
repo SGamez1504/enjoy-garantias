@@ -9,17 +9,21 @@
   let nextHist = 1;
 
   function revisar(c) {
-    if (!['recibido_tienda', 'enviado_fabrica', 'devuelto_tienda', 'entregado_cliente', 'pedido_reposicion', 'cambio_producto'].includes(c.estado)) return 'casos_estado_valido';
+    if (!['recibido_tienda', 'enviado_fabrica', 'devuelto_tienda', 'entregado_cliente', 'pedido_reposicion', 'cambio_producto', 'reparacion_local'].includes(c.estado)) return 'casos_estado_valido';
     if (!c.recibido_por?.trim()) return 'casos_recibido_por';
+    if (!(c.fecha_devolucion == null || c.fecha_envio || c.reparacion_fecha_envio)) return 'casos_devolucion_requiere_envio';
+    if (c.estado === 'reparacion_local' && !(c.reparacion_lugar?.trim() && c.reparacion_fecha_envio && (!c.reparacion_mensajeria || c.reparacion_guia_path))) return 'casos_reparacion_completa';
+    if (c.reparacion_guia_path && !c.reparacion_mensajeria) return 'casos_reparacion_guia';
+    if (c.fecha_devolucion && c.reparacion_fecha_envio && c.fecha_devolucion < c.reparacion_fecha_envio) return 'casos_devolucion_orden_reparacion';
+    if (c.fecha_devolucion && !(c.veredicto_reparado !== null && c.veredicto_dano?.trim() && c.veredicto_funcionamiento)) return 'casos_veredicto_completo';
     if (c.estado === 'cambio_producto' && !(c.nuevo_producto?.trim() && c.nuevo_numero_serial?.trim() && c.cambio_erp_confirmado)) return 'casos_cambio_completo';
     const nFotos = c.fotos_envio.length;
     if (c.fecha_envio ? nFotos < 1 || nFotos > 5 : nFotos !== 0) return 'casos_envio_con_fotos';
     if (!c.fecha_envio !== !c.guia_path) return 'casos_envio_con_guia';
     if (c.estado === 'enviado_fabrica' && !c.guia_path) return 'casos_enviado_requiere_guia';
     if (c.estado === 'devuelto_tienda' && !c.fecha_devolucion) return 'casos_devuelto_requiere_fecha';
-    if (c.fecha_devolucion && !c.fecha_envio) return 'casos_devolucion_requiere_envio';
     if (c.fecha_envio && c.fecha_envio < c.fecha_recibido) return 'casos_envio_orden';
-    if (c.fecha_devolucion && c.fecha_devolucion < c.fecha_envio) return 'casos_devolucion_orden';
+    if (c.fecha_devolucion && c.fecha_envio && c.fecha_devolucion < c.fecha_envio) return 'casos_devolucion_orden';
     return null;
   }
   const historial = (caso_id, estado) => db.caso_historial.push({
@@ -37,7 +41,9 @@
   function crear(o) {
     const id = nextId++;
     const c = {
-      id, numero_caso: numeroCaso(o.numero_pedido, id), nuevo_producto: null, nuevo_numero_serial: null, cambio_erp_confirmado: false, fecha_envio: null, guia_path: null, guia_nombre: null, fotos_envio: [], fecha_devolucion: null,
+      id, numero_caso: numeroCaso(o.numero_pedido, id), nuevo_producto: null, nuevo_numero_serial: null, cambio_erp_confirmado: false, fecha_envio: null,
+      reparacion_lugar: null, reparacion_mensajeria: false, reparacion_guia_path: null, reparacion_guia_nombre: null, reparacion_fecha_envio: null,
+      veredicto_reparado: null, veredicto_dano: null, veredicto_funcionamiento: null, guia_path: null, guia_nombre: null, fotos_envio: [], fecha_devolucion: null,
       estado: 'recibido_tienda', created_at: ahora(), updated_at: ahora(), ...o,
     };
     const r = revisar(c);

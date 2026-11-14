@@ -58,7 +58,7 @@
             <th>Falla</th>
             <th>Fecha envío</th>
             <th>Evidencia</th>
-            <th>Recibido de fábrica</th>
+            <th>Regreso a tienda</th>
             <th>Constancia</th>
             <th class="fija">Estado</th>
           </tr>
@@ -88,8 +88,38 @@
         <div class="rejilla">
           <label>Estado <select name="estado"></select></label>
           <label>Fecha de envío <input name="fecha_envio" type="date"></label>
-          <label>Recibido de fábrica <input name="fecha_devolucion" type="date"></label>
+          <label>Regreso a tienda <input name="fecha_devolucion" type="date"></label>
           <label>Reemplazar guía (PDF) <input name="guia" type="file" accept="application/pdf,.pdf"></label>
+          <fieldset id="campos-reparacion" class="ancho" hidden>
+            <legend>Reparación local</legend>
+            <div class="rejilla">
+              <label>Lugar de reparación <input name="reparacion_lugar"></label>
+              <label>Fecha de envío a reparación <input name="reparacion_fecha_envio" type="date"></label>
+              <label class="check ancho"><input name="reparacion_mensajeria" type="checkbox"> <span>Se envió por mensajería</span></label>
+              <label class="ancho campo-reparacion-guia" hidden>Guía de la mensajería (PDF) <input name="reparacion_guia" type="file" accept="application/pdf,.pdf"></label>
+            </div>
+          </fieldset>
+          <fieldset id="campos-veredicto" class="ancho" hidden>
+            <legend>Veredicto de la garantía</legend>
+            <div class="rejilla">
+              <label>¿Se reparó?
+                <select name="veredicto_reparado">
+                  <option value="">Selecciona…</option>
+                  <option value="si">Sí, se reparó</option>
+                  <option value="no">No se reparó</option>
+                </select>
+              </label>
+              <label>¿Funciona?
+                <select name="veredicto_funcionamiento">
+                  <option value="">Selecciona…</option>
+                  <option value="total">Funciona totalmente</option>
+                  <option value="parcial">Funciona parcialmente</option>
+                  <option value="no_funciona">No funciona</option>
+                </select>
+              </label>
+              <label class="ancho">¿Cuál es el daño? <textarea name="veredicto_dano" rows="2" placeholder="Diagnóstico o daño encontrado"></textarea></label>
+            </div>
+          </fieldset>
           <div id="campos-cambio" class="ancho rejilla" hidden>
             <label>Nuevo producto <input name="nuevo_producto"></label>
             <label>Nuevo número serial <input name="nuevo_numero_serial"></label>
@@ -129,12 +159,33 @@
     </form>
   </dialog>
 
-  <!-- Registrar recibido de fábrica -->
+  <!-- Registrar regreso a tienda (de fábrica o de reparación local) -->
   <dialog id="dlg-devolucion">
     <form id="form-devolucion" method="dialog">
-      <h2>Registrar recibido de fábrica</h2>
+      <h2>Registrar regreso a tienda</h2>
       <p class="dlg-sub"></p>
-      <label>Fecha de recibido <input name="fecha_devolucion" type="date" required></label>
+      <label>Fecha de regreso a tienda <input name="fecha_devolucion" type="date" required></label>
+      <fieldset>
+        <legend>Veredicto de la garantía</legend>
+        <div class="rejilla">
+        <label>¿Se reparó?
+          <select name="veredicto_reparado" required>
+            <option value="">Selecciona…</option>
+            <option value="si">Sí, se reparó</option>
+            <option value="no">No se reparó</option>
+          </select>
+        </label>
+        <label>¿Funciona?
+          <select name="veredicto_funcionamiento" required>
+            <option value="">Selecciona…</option>
+            <option value="total">Funciona totalmente</option>
+            <option value="parcial">Funciona parcialmente</option>
+            <option value="no_funciona">No funciona</option>
+          </select>
+        </label>
+        <label class="ancho">¿Cuál es el daño? <textarea name="veredicto_dano" rows="2" required placeholder="Diagnóstico o daño encontrado"></textarea></label>
+        </div>
+      </fieldset>
       <p class="error" role="alert" hidden></p>
       <div class="dlg-acciones">
         <button class="sutil" type="button" data-cerrar>Cancelar</button>
@@ -157,6 +208,23 @@
       <p class="error" role="alert" hidden></p>
       <div class="dlg-acciones" id="det-acciones"></div>
     </div>
+  </dialog>
+
+  <!-- Reparación local -->
+  <dialog id="dlg-reparacion">
+    <form id="form-reparacion" method="dialog">
+      <h2>Reparación local</h2>
+      <p class="dlg-sub"></p>
+      <label>¿Dónde se envió a reparar? <input name="reparacion_lugar" placeholder="Taller o servicio técnico" required></label>
+      <label>Fecha de envío <input name="reparacion_fecha_envio" type="date" required></label>
+      <label class="check"><input name="reparacion_mensajeria" type="checkbox"> <span>Se envió por mensajería</span></label>
+      <label class="campo-reparacion-guia" hidden>Guía de la mensajería (PDF) <input name="reparacion_guia" type="file" accept="application/pdf,.pdf"></label>
+      <p class="error" role="alert" hidden></p>
+      <div class="dlg-acciones">
+        <button class="sutil" type="button" data-cerrar>Cancelar</button>
+        <button class="primario" type="submit">Guardar</button>
+      </div>
+    </form>
   </dialog>
 
   <!-- Cambio de producto -->

@@ -27,6 +27,18 @@ create table public.casos (
   nuevo_numero_serial   text,
   cambio_erp_confirmado boolean not null default false,
 
+  -- Solo en una reparación local
+  reparacion_lugar       text,
+  reparacion_mensajeria  boolean not null default false,
+  reparacion_guia_path   text,
+  reparacion_guia_nombre text,
+  reparacion_fecha_envio date,
+
+  -- Veredicto que se pide al registrar el regreso a tienda
+  veredicto_reparado       boolean,
+  veredicto_dano           text,
+  veredicto_funcionamiento text,
+
   estado           text not null default 'recibido_tienda',
 
   created_at       timestamptz not null default now(),
@@ -53,13 +65,38 @@ create table public.casos (
   ),
   constraint casos_estado_valido check (estado in (
     'recibido_tienda', 'enviado_fabrica', 'devuelto_tienda', 'entregado_cliente',
-    'pedido_reposicion', 'cambio_producto'
+    'pedido_reposicion', 'cambio_producto', 'reparacion_local'
   )),
   -- No hay fecha de envío sin el PDF de la guía, ni guía sin fecha.
   constraint casos_envio_con_guia check ((fecha_envio is null) = (guia_path is null)),
   constraint casos_enviado_requiere_guia check (estado <> 'enviado_fabrica' or guia_path is not null),
   constraint casos_devuelto_requiere_fecha check (estado <> 'devuelto_tienda' or fecha_devolucion is not null),
-  constraint casos_devolucion_requiere_envio check (fecha_devolucion is null or fecha_envio is not null),
+  -- El regreso a tienda puede venir de la fábrica o de una reparación local.
+  constraint casos_devolucion_requiere_envio check (
+    fecha_devolucion is null or fecha_envio is not null or reparacion_fecha_envio is not null
+  ),
+  constraint casos_reparacion_completa check (
+    estado <> 'reparacion_local' or (
+      length(trim(coalesce(reparacion_lugar, ''))) > 0
+      and reparacion_fecha_envio is not null
+      and (not reparacion_mensajeria or reparacion_guia_path is not null)
+    )
+  ),
+  constraint casos_reparacion_guia check (reparacion_guia_path is null or reparacion_mensajeria),
+  constraint casos_reparacion_orden check (reparacion_fecha_envio is null or reparacion_fecha_envio >= fecha_recibido),
+  constraint casos_devolucion_orden_reparacion check (
+    fecha_devolucion is null or reparacion_fecha_envio is null or fecha_devolucion >= reparacion_fecha_envio
+  ),
+  constraint casos_funcionamiento_valido check (
+    veredicto_funcionamiento is null or veredicto_funcionamiento in ('total', 'parcial', 'no_funciona')
+  ),
+  constraint casos_veredicto_completo check (
+    fecha_devolucion is null or (
+      veredicto_reparado is not null
+      and length(trim(coalesce(veredicto_dano, ''))) > 0
+      and veredicto_funcionamiento is not null
+    )
+  ),
   constraint casos_envio_orden check (fecha_envio is null or fecha_envio >= fecha_recibido),
   constraint casos_devolucion_orden check (fecha_devolucion is null or fecha_devolucion >= fecha_envio)
 );
